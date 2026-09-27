@@ -110,16 +110,17 @@ async function runTests() {
     });
     assert(resPostEmpty.status === 400, 'Empty raw_text is rejected with 400 Bad Request');
 
-    // 8. Voice Submission Stub POST
-    console.log('\nTest 8: Voice Submission Stub (POST /api/submissions/voice)');
+    // 8. Voice Submission Pipeline (POST /api/submissions/voice)
+    console.log('\nTest 8: Voice Submission Pipeline (POST /api/submissions/voice)');
     const resPostVoice = await fetch(`${baseUrl}/api/submissions/voice`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ note: 'Voice binary stub' }),
+      body: JSON.stringify({ sample_text: 'High voltage transformer spark and oil leakage outside school.' }),
     });
     const dataPostVoice = await resPostVoice.json();
-    assert(resPostVoice.status === 202, 'Voice stub returns 202 Accepted');
-    assert(dataPostVoice.status === 'stubbed_day_1', 'Reports stubbed_day_1 status');
+    assert(resPostVoice.status === 201, 'Voice pipeline returns 201 Created');
+    assert(dataPostVoice.success === true, 'Voice pipeline reports success');
+    assert(Boolean(dataPostVoice.stt?.transcript), 'Voice pipeline includes STT transcript');
 
     // 9. Admin Security Guard & Recompute POST
     console.log('\nTest 9: Admin Endpoint Authentication Guard');
