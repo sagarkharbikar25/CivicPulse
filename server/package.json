@@ -8,7 +8,9 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "test": "node test/scoringEngine.test.js",
-    "test:api": "node test/api.test.js"
+    "test:api": "node test/api.test.js",
+    "test:ai": "node test/aiPipeline.test.js",
+    "test:all": "node test/scoringEngine.test.js && node test/api.test.js && node test/aiPipeline.test.js"
   },
   "keywords": [
     "civic-tech",
@@ -25,6 +27,7 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "express-rate-limit": "^8.7.0",
-    "helmet": "^8.3.0"
+    "helmet": "^8.3.0",
+    "multer": "^2.4.0"
   }
 }
