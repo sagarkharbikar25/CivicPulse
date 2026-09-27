@@ -5,72 +5,69 @@ export default function Navbar({ activeTab, setActiveTab, onRecompute, isRecompu
   const tabs = [
     { id: 'dashboard', label: 'Command Heatmap', icon: MapPinIcon },
     { id: 'submit', label: 'Citizen Ingest', icon: SendIcon },
-    { id: 'policymakers', label: 'Policymaker View', icon: PulseIcon },
+    { id: 'policymakers', label: 'Policymaker Queue', icon: PulseIcon },
   ];
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-[#0A0A0B]/80 backdrop-blur-xl border-b border-white/[0.08]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Brand & Logo */}
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('dashboard')}>
-            <div className="relative w-9 h-9 rounded-xl overflow-hidden border border-cyan-400/40 shadow-glow-cyan/50 flex items-center justify-center bg-black">
-              <img src="/civicpulse.png" alt="CivicPulse Logo" className="w-full h-full object-cover" />
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="font-bold tracking-tight text-white text-lg">CIVIC</span>
-                <span className="font-extrabold tracking-tight text-cyan-400 text-lg drop-shadow-[0_0_12px_rgba(0,210,255,0.6)]">PULSE</span>
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 ml-1">
-                  BRICS DPI
-                </span>
-              </div>
-              <p className="text-[10px] text-slate-400 -mt-0.5 hidden sm:block">AI Public Infrastructure Prioritization</p>
+    <header className="sticky top-0 z-50 w-full pt-4 pb-2 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto flex items-center justify-between">
+        {/* Left: Brand Logo & Title */}
+        <div
+          className="flex items-center gap-3 cursor-pointer group"
+          onClick={() => setActiveTab('dashboard')}
+        >
+          <div className="relative w-9 h-9 rounded-full overflow-hidden border border-white/20 p-0.5 shadow-glow-white/20 bg-black transition-transform duration-200 group-hover:scale-105">
+            <img src="/civicpulse.png" alt="CivicPulse" className="w-full h-full object-cover rounded-full" />
+          </div>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span className="font-serif font-bold text-white text-base tracking-tight">Civic</span>
+              <span className="font-serif italic font-semibold text-white/90 text-base">Pulse</span>
+              <span className="text-[9px] font-mono uppercase tracking-widest px-2 py-0.5 rounded-full bg-white/[0.08] text-white/70 border border-white/10 ml-1 hidden sm:inline">
+                DPI
+              </span>
             </div>
           </div>
+        </div>
 
-          {/* Navigation Tabs */}
-          <nav className="flex items-center bg-[#141418] p-1 rounded-xl border border-white/10 shadow-inner">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`
-                    flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer
-                    ${isActive
-                      ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-black shadow-glow-cyan'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
-                    }
-                  `}
-                >
-                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-black' : 'text-slate-400'}`} />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </nav>
+        {/* Center: Floating Pill Navigation Island (Matching Reference) */}
+        <nav className="glass-pill px-2 py-1.5 rounded-full flex items-center gap-1 shadow-2xl">
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`
+                  px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-200 cursor-pointer
+                  ${isActive
+                    ? 'bg-white text-black font-semibold shadow-glow-white'
+                    : 'text-slate-400 hover:text-white hover:bg-white/[0.06]'
+                  }
+                `}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </nav>
 
-          {/* Right Controls */}
-          <div className="flex items-center gap-3">
-            {/* Live Indicator */}
-            <div className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Pipeline Live</span>
-            </div>
+        {/* Right: Actions Matching Reference "Host an Event ↗" and "Log in" */}
+        <div className="flex items-center gap-2.5">
+          {/* Sync Button matching dark frosted pill */}
+          <button
+            onClick={onRecompute}
+            disabled={isRecomputing}
+            className="hidden md:flex items-center gap-1.5 glass-pill glass-pill-hover px-4 py-1.5 rounded-full text-xs font-medium text-slate-300 hover:text-white cursor-pointer disabled:opacity-50"
+          >
+            <RefreshIcon className={`w-3.5 h-3.5 text-slate-300 ${isRecomputing ? 'animate-spin' : ''}`} />
+            <span>Sync AI Ranks ↗</span>
+          </button>
 
-            {/* Recompute Button */}
-            <button
-              onClick={onRecompute}
-              disabled={isRecomputing}
-              title="Trigger scoring engine recalculation"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 hover:border-cyan-400/40 text-slate-300 hover:text-white text-xs font-medium transition-all duration-150 cursor-pointer disabled:opacity-50"
-            >
-              <RefreshIcon className={`w-3.5 h-3.5 text-cyan-400 ${isRecomputing ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Sync AI Ranks</span>
-            </button>
+          {/* White Pill Badge matching reference "Log in" */}
+          <div className="flex items-center gap-2 bg-white text-black font-semibold px-4 py-1.5 rounded-full text-xs shadow-glow-white select-none">
+            <span className="w-1.5 h-1.5 rounded-full bg-black animate-pulse" />
+            <span>Live Engine</span>
           </div>
         </div>
       </div>

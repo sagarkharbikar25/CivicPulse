@@ -68,7 +68,6 @@ export default function App() {
   const handleComplaintSubmitted = (newSub) => {
     setSubmissions(prev => [newSub, ...prev]);
 
-    // Update heatmap cluster
     setHeatmapData(prev =>
       prev.map(p => {
         if (p.name === newSub.region_name) {
@@ -82,11 +81,14 @@ export default function App() {
       })
     );
 
-    showToast(`New grievance indexed for ${newSub.region_name} (Urgency: ${newSub.urgency_score})`);
+    showToast(`Grievance indexed for ${newSub.region_name} (Urgency: ${newSub.urgency_score})`);
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0B] text-slate-100 flex flex-col font-sans selection:bg-cyan-500/20 selection:text-cyan-300">
+    <div className="min-h-screen bg-[#000000] text-slate-100 flex flex-col font-sans selection:bg-white/20 selection:text-white relative">
+      {/* Ambient spotlights from reference corners */}
+      <div className="ambient-spotlights" />
+
       {/* Top Navbar */}
       <Navbar
         activeTab={activeTab}
@@ -96,7 +98,7 @@ export default function App() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         {activeTab === 'dashboard' && (
           <Dashboard
             heatmapData={heatmapData}
@@ -126,8 +128,8 @@ export default function App() {
 
       {/* Global Notification Toast */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 animate-bounce duration-300">
-          <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-[#16161f] border border-cyan-500/40 text-xs font-semibold text-white shadow-2xl shadow-cyan-500/20">
+        <div className="fixed bottom-6 right-6 z-50">
+          <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-[#121218] border border-white/20 text-xs font-semibold text-white shadow-2xl shadow-white/10">
             <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
             <span>{toastMessage}</span>
           </div>
@@ -135,19 +137,20 @@ export default function App() {
       )}
 
       {/* Footer */}
-      <footer className="border-t border-white/[0.06] bg-[#0c0c0e] py-6 mt-auto">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
+      <footer className="border-t border-white/[0.08] bg-[#050508]/80 backdrop-blur-md py-6 mt-16 relative z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500 font-light">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-300">CivicPulse DPI Platform</span>
+            <span className="font-serif font-bold text-white text-sm">CivicPulse</span>
             <span>—</span>
-            <span>BRICS Innovation Track 1</span>
+            <span>Digital Public Infrastructure (Track 1)</span>
           </div>
-          <div className="flex items-center gap-4 text-[11px] font-mono">
-            <span className="text-cyan-400/80">React + Vite + Tailwind CSS</span>
-            <span>•</span>
-            <span className="text-slate-400">Zero External Icon Libs</span>
-            <span>•</span>
-            <span className="text-emerald-400/80">100% Custom SVGs</span>
+          <div className="flex items-center gap-3 text-[11px] font-mono">
+            <span className="px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/10 text-slate-400">
+              Leaflet • CartoDB Dark Matter
+            </span>
+            <span className="px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/10 text-slate-400">
+              Playfair Display Serif
+            </span>
           </div>
         </div>
       </footer>

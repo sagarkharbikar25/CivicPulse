@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import HeatmapView from '../components/map/HeatmapView';
+import LeafletMapView from '../components/map/LeafletMapView';
 import { Card, CardHeader, Badge, Button, StatPill } from '../components/ui';
-import { PulseIcon, AlertIcon, RoadIcon, WaterIcon, ElectricityIcon, SanitationIcon, ChevronIcon, MicIcon, SendIcon } from '../components/icons';
+import { PulseIcon, AlertIcon, RoadIcon, WaterIcon, MicIcon, SendIcon, ChevronIcon } from '../components/icons';
 
 export default function Dashboard({
   heatmapData = [],
@@ -16,7 +16,6 @@ export default function Dashboard({
 
   const selectedNode = heatmapData.find(p => p.id === selectedPointId) || heatmapData[0];
 
-  // Filtered submissions
   const filteredSubmissions = submissions.filter(sub => {
     if (categoryFilter !== 'all' && sub.category !== categoryFilter) return false;
     return true;
@@ -31,53 +30,93 @@ export default function Dashboard({
   ];
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* Top Banner: One-Line Pitch + Live Pulse */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-cyan-950/40 via-[#121216] to-blue-950/30 border border-cyan-500/20 p-6 shadow-xl">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-mono uppercase tracking-wider">
-                BRICS Track 1 DPI Solution
-              </span>
-              <span className="text-xs text-slate-400">| Multilingual Multimodal Ingestion</span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              AI-Powered Citizen <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400">Infrastructure Prioritization</span>
-            </h1>
-            <p className="text-sm text-slate-300 max-w-2xl mt-1.5 leading-relaxed">
-              Synthesizing fragmented citizen voices across Hindi, Marathi, and English into a real-time, defensible capital allocation heatmap in under 5 seconds.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3 shrink-0">
-            <Button
-              variant="primary"
-              size="md"
-              onClick={onNavigateSubmit}
-              icon={MicIcon}
-            >
-              Test Ingest Pipeline
-            </Button>
-            <Button
-              variant="secondary"
-              size="md"
-              onClick={onNavigatePolicymakers}
-            >
-              Priority Action Plan
-            </Button>
+    <div className="space-y-12 pb-16">
+      {/* HERO SECTION MATCHING REFERENCE IMAGE */}
+      <section className="relative pt-6 pb-12 overflow-hidden flex flex-col items-center justify-center text-center">
+        {/* Floating Telemetry Badge Left (Top) */}
+        <div className="hidden lg:flex items-center gap-3 absolute left-4 top-12 select-none pointer-events-none">
+          <div className="light-slit w-20" />
+          <div className="glass-pill px-3.5 py-1.5 rounded-full text-left border border-white/10 shadow-2xl">
+            <span className="text-[10px] text-slate-400 block font-mono">• Old City Grid</span>
+            <span className="text-xs font-bold text-white font-mono">95.1 Urgency</span>
           </div>
         </div>
-      </div>
 
-      {/* Key Metric Counters */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Floating Telemetry Badge Left (Bottom) */}
+        <div className="hidden lg:flex items-center gap-3 absolute left-12 bottom-6 select-none pointer-events-none">
+          <div className="light-slit w-16" />
+          <div className="glass-pill px-3.5 py-1.5 rounded-full text-left border border-white/10 shadow-2xl">
+            <span className="text-[10px] text-slate-400 block font-mono">• East Ward Feeder</span>
+            <span className="text-xs font-bold text-white font-mono">92.4 Urgency</span>
+          </div>
+        </div>
+
+        {/* Floating Telemetry Badge Right (Top) */}
+        <div className="hidden lg:flex items-center gap-3 absolute right-4 top-16 select-none pointer-events-none">
+          <div className="glass-pill px-3.5 py-1.5 rounded-full text-right border border-white/10 shadow-2xl">
+            <span className="text-[10px] text-slate-400 block font-mono">Industrial Highway •</span>
+            <span className="text-xs font-bold text-white font-mono">88.7 Urgency</span>
+          </div>
+          <div className="light-slit w-20" />
+        </div>
+
+        {/* Floating Telemetry Badge Right (Bottom) */}
+        <div className="hidden lg:flex items-center gap-3 absolute right-10 bottom-8 select-none pointer-events-none">
+          <div className="glass-pill px-3.5 py-1.5 rounded-full text-right border border-white/10 shadow-2xl">
+            <span className="text-[10px] text-slate-400 block font-mono">Metro Feeder •</span>
+            <span className="text-xs font-bold text-white font-mono">61.5 Urgency</span>
+          </div>
+          <div className="light-slit w-16" />
+        </div>
+
+        {/* Top Mini Pill Announcement */}
+        <button
+          onClick={onNavigateSubmit}
+          className="glass-pill glass-pill-hover px-4 py-1.5 rounded-full text-xs font-medium text-slate-300 hover:text-white flex items-center gap-2 mb-6 cursor-pointer"
+        >
+          <span className="text-cyan-400">⚡</span>
+          <span>Speak it. See it prioritized in 5 seconds.</span>
+          <span className="text-slate-400">→</span>
+        </button>
+
+        {/* High-Contrast Bold Serif + Italic Serif Headline */}
+        <h1 className="font-serif text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-normal text-white tracking-tight leading-[1.05] max-w-4xl">
+          One-click for your <br />
+          <span className="italic font-light text-slate-100">Prioritization</span>
+        </h1>
+
+        {/* Subtitle */}
+        <p className="text-sm sm:text-base text-slate-400 max-w-xl mx-auto mt-6 leading-relaxed font-light">
+          Autonomous municipal intelligence turning multilingual citizen complaints into an explainable, ranked capital expenditure heatmap in seconds.
+        </p>
+
+        {/* Action Buttons Matching Reference Style */}
+        <div className="flex items-center gap-3 mt-8">
+          <button
+            onClick={() => {
+              const el = document.getElementById('map-section');
+              if (el) el.scrollIntoView({ behavior: 'smooth' });
+            }}
+            className="px-6 py-2.5 rounded-full bg-[#18181E] hover:bg-[#22222A] text-white text-xs font-semibold border border-white/15 hover:border-white/30 transition-all cursor-pointer shadow-lg"
+          >
+            Explore Map ↗
+          </button>
+          <button
+            onClick={onNavigateSubmit}
+            className="px-6 py-2.5 rounded-full glass-pill glass-pill-hover text-slate-300 hover:text-white text-xs font-medium cursor-pointer"
+          >
+            Submit Grievance
+          </button>
+        </div>
+      </section>
+
+      {/* METRICS COUNTER ROW */}
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatPill
           icon={PulseIcon}
-          label="Total Complaints Ingested"
+          label="Total Grievances Ingested"
           value={submissions.length + 138}
-          subvalue="across 7 wards"
+          subvalue="across 7 sectors"
           trend="+18% vs avg"
           trendType="neutral"
         />
@@ -85,33 +124,33 @@ export default function Dashboard({
           icon={AlertIcon}
           label="Critical Priority Clusters"
           value={priorities.filter(p => p.avg_urgency >= 85).length || 2}
-          subvalue="action required"
+          subvalue="immediate deployment"
           trend="Severe"
           trendType="negative"
         />
         <StatPill
           icon={RoadIcon}
-          label="Mean Urgency Index"
+          label="Mean Algorithmic Urgency"
           value="84.2"
-          subvalue="weighted score / 100"
+          subvalue="composite index / 100"
           trend="Target &lt;60"
           trendType="positive"
         />
         <StatPill
           icon={WaterIcon}
-          label="AI Inference Latency"
-          value="1.4s"
-          subvalue="STT + LLM classification"
-          trend="&lt; 5s SLA"
+          label="Multilingual Pipeline"
+          value="3 Langs"
+          subvalue="Hindi, Marathi, English"
+          trend="1.2s Latency"
           trendType="positive"
         />
-      </div>
+      </section>
 
-      {/* Main Grid: Heatmap + Priority Feed */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Heatmap (7 cols) */}
+      {/* MAP & INCIDENTS SECTION */}
+      <section id="map-section" className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left Column: Leaflet Map (7 cols) */}
         <div className="lg:col-span-7 space-y-4">
-          <HeatmapView
+          <LeafletMapView
             points={heatmapData}
             selectedPointId={selectedPointId}
             onSelectPoint={(point) => setSelectedPointId(point.id)}
@@ -119,46 +158,47 @@ export default function Dashboard({
             onLayerChange={setActiveLayer}
           />
 
-          {/* Regional Inspection Card */}
+          {/* Regional Details Card */}
           {selectedNode && (
-            <Card glow className="bg-[#121216]/90 border-cyan-500/30">
+            <div className="rounded-2xl bg-[#09090C] border border-white/10 p-5 shadow-2xl relative overflow-hidden">
+              <div className="light-slit-accent absolute top-0 inset-x-0" />
               <div className="flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-cyan-400" />
                     <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                      Regional Focus: {selectedNode.name}
+                      Regional Sector: {selectedNode.name}
                     </h3>
                   </div>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Lat: {selectedNode.latitude.toFixed(4)} | Long: {selectedNode.longitude.toFixed(4)}
+                  <p className="text-xs text-slate-400 mt-0.5 font-mono">
+                    Lat: {selectedNode.latitude.toFixed(4)} • Long: {selectedNode.longitude.toFixed(4)}
                   </p>
                 </div>
 
                 <div className="text-right">
-                  <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Urgency Rating</span>
-                  <span className="text-lg font-bold font-mono text-cyan-300">
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-mono">Urgency Score</span>
+                  <span className="text-xl font-bold font-mono text-cyan-300">
                     {selectedNode.intensity}/100
                   </span>
                 </div>
               </div>
 
-              {/* Progress bar metrics */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 pt-3 border-t border-white/[0.08]">
+              {/* Progress metrics */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-5 pt-4 border-t border-white/[0.08]">
                 <div>
-                  <span className="text-[11px] text-slate-400 block mb-1">Infrastructure Gap</span>
-                  <div className="w-full bg-white/5 rounded-full h-2 overflow-hidden">
+                  <span className="text-[11px] text-slate-400 block mb-1">Infrastructure Deficit</span>
+                  <div className="w-full bg-white/5 rounded-full h-1.5 overflow-hidden">
                     <div
                       className="bg-amber-400 h-full rounded-full transition-all duration-500"
                       style={{ width: `${selectedNode.gapScore || 70}%` }}
                     />
                   </div>
-                  <span className="text-[11px] font-mono text-amber-300 mt-1 block">{selectedNode.gapScore}% deficit</span>
+                  <span className="text-[11px] font-mono text-amber-300 mt-1 block">{selectedNode.gapScore}% gap score</span>
                 </div>
 
                 <div>
-                  <span className="text-[11px] text-slate-400 block mb-1">Impacted Population</span>
-                  <div className="w-full bg-white/5 rounded-full h-2 overflow-hidden">
+                  <span className="text-[11px] text-slate-400 block mb-1">Impacted Citizens</span>
+                  <div className="w-full bg-white/5 rounded-full h-1.5 overflow-hidden">
                     <div className="bg-cyan-400 h-full rounded-full" style={{ width: '68%' }} />
                   </div>
                   <span className="text-[11px] font-mono text-cyan-300 mt-1 block">
@@ -167,43 +207,41 @@ export default function Dashboard({
                 </div>
 
                 <div>
-                  <span className="text-[11px] text-slate-400 block mb-1">Active Citizen Reports</span>
-                  <div className="w-full bg-white/5 rounded-full h-2 overflow-hidden">
+                  <span className="text-[11px] text-slate-400 block mb-1">Active Clustered Reports</span>
+                  <div className="w-full bg-white/5 rounded-full h-1.5 overflow-hidden">
                     <div className="bg-rose-400 h-full rounded-full" style={{ width: '85%' }} />
                   </div>
                   <span className="text-[11px] font-mono text-rose-300 mt-1 block">
-                    {selectedNode.submissionsCount || 12} reports clustered
+                    {selectedNode.submissionsCount || 12} citizen complaints
                   </span>
                 </div>
               </div>
-            </Card>
+            </div>
           )}
         </div>
 
-        {/* Right Column: Ingested Feed & Ranked Queue (5 cols) */}
+        {/* Right Column: Live Ingestion Feed (5 cols) */}
         <div className="lg:col-span-5 space-y-4">
-          <Card>
-            <CardHeader
-              title="Recent Ingested Transcripts"
-              subtitle="Live stream with automatic translation & classification"
-              action={
-                <div className="flex items-center gap-1">
-                  <span className="text-xs text-slate-400">Total: {filteredSubmissions.length}</span>
-                </div>
-              }
-            />
+          <div className="rounded-2xl bg-[#09090C] border border-white/10 p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
+              <div>
+                <h3 className="text-sm font-semibold text-white tracking-tight">Live Ingested Transcripts</h3>
+                <p className="text-xs text-slate-400">Translated and categorized in real time</p>
+              </div>
+              <span className="text-xs font-mono text-slate-400">{filteredSubmissions.length} indexed</span>
+            </div>
 
-            {/* Category Filter Pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none">
+            {/* Filter pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
               {categories.map((cat) => (
                 <button
                   key={cat.id}
                   onClick={() => setCategoryFilter(cat.id)}
                   className={`
-                    px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer
+                    px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-all cursor-pointer
                     ${categoryFilter === cat.id
-                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                      : 'bg-white/[0.04] text-slate-400 hover:text-slate-200 border border-transparent'
+                      ? 'bg-white text-black font-semibold shadow-glow-white'
+                      : 'bg-white/[0.04] text-slate-400 hover:text-white'
                     }
                   `}
                 >
@@ -212,21 +250,21 @@ export default function Dashboard({
               ))}
             </div>
 
-            {/* Submissions List */}
-            <div className="space-y-3 mt-3 max-h-[480px] overflow-y-auto pr-1">
+            {/* Feed Items */}
+            <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
               {filteredSubmissions.map((sub) => (
                 <div
                   key={sub.id}
-                  className="rounded-xl bg-[#16161b] p-3.5 border border-white/[0.06] hover:border-cyan-500/30 transition-all duration-200 space-y-2.5"
+                  className="rounded-xl bg-[#101015] p-3.5 border border-white/[0.06] hover:border-white/20 transition-all space-y-2.5"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Badge category={sub.category} />
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/[0.05] text-slate-400 border border-white/5 uppercase">
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/[0.05] text-slate-400 uppercase">
                         {sub.raw_input_type}
                       </span>
                       {sub.language_detected && (
-                        <span className="text-[10px] font-mono text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/20">
+                        <span className="text-[10px] font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20">
                           {sub.language_detected}
                         </span>
                       )}
@@ -234,20 +272,17 @@ export default function Dashboard({
                     <Badge urgencyScore={sub.urgency_score} />
                   </div>
 
-                  {/* Translated Text */}
                   <p className="text-xs text-slate-200 leading-relaxed font-normal">
                     "{sub.translated_text}"
                   </p>
 
-                  {/* Original Text if different */}
                   {sub.language_detected && sub.language_detected.toLowerCase() !== 'english' && (
-                    <div className="text-[11px] text-slate-400 italic bg-black/30 p-2 rounded-lg border border-white/5">
+                    <div className="text-[11px] text-slate-400 italic bg-black/40 p-2 rounded-lg border border-white/5">
                       <span className="text-slate-400 not-italic mr-1 text-[10px] uppercase font-mono">Original:</span>
                       "{sub.raw_text}"
                     </div>
                   )}
 
-                  {/* Metadata Footer */}
                   <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-white/[0.04]">
                     <span className="truncate">{sub.region_name}</span>
                     <span className="font-mono text-[10px] text-slate-400">
@@ -257,9 +292,9 @@ export default function Dashboard({
                 </div>
               ))}
             </div>
-          </Card>
+          </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 }

@@ -8,60 +8,157 @@
   }
 
   body {
-    background-color: #0A0A0B;
-    color: #F1F5F9;
+    background-color: #000000;
+    color: #EDEDED;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     overflow-x: hidden;
   }
 }
 
-/* Custom glowing pulse animations */
-@keyframes neon-glow {
-  0%, 100% {
-    box-shadow: 0 0 15px rgba(0, 210, 255, 0.35), 0 0 30px rgba(0, 210, 255, 0.15);
+/* Glowing horizontal light slits from reference image */
+.light-slit {
+  position: relative;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 30%, #ffffff 50%, rgba(255,255,255,0.4) 70%, transparent 100%);
+  box-shadow: 0 0 16px 1px rgba(255, 255, 255, 0.6);
+}
+
+.light-slit-accent {
+  position: relative;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, rgba(0, 210, 255, 0.6) 30%, #ffffff 50%, rgba(0, 210, 255, 0.6) 70%, transparent 100%);
+  box-shadow: 0 0 18px 2px rgba(0, 210, 255, 0.5), 0 0 8px rgba(255, 255, 255, 0.8);
+}
+
+/* Subtle ambient spotlight glows matching reference corners */
+.ambient-spotlights {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: 
+    radial-gradient(ellipse 70% 55% at 90% 12%, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.015) 50%, transparent 80%),
+    radial-gradient(ellipse 70% 55% at 8% 85%, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.01) 50%, transparent 80%);
+}
+
+/* Glassmorphism containers */
+.glass-pill {
+  background: rgba(14, 14, 18, 0.65);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+}
+
+.glass-pill-hover {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-pill-hover:hover {
+  background: rgba(22, 22, 28, 0.85);
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.08);
+}
+
+/* Leaflet dark theme customizations */
+.leaflet-container {
+  background-color: #050508 !important;
+  font-family: inherit;
+  border-radius: 1rem;
+}
+
+/* Seamlessly blend CartoDB dark tiles */
+.leaflet-tile {
+  filter: brightness(0.9) contrast(1.15) !important;
+}
+
+/* Leaflet zoom controls styling */
+.leaflet-bar {
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 0.75rem !important;
+  overflow: hidden;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5) !important;
+}
+
+.leaflet-bar a {
+  background-color: rgba(14, 14, 18, 0.9) !important;
+  color: #EDEDED !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  backdrop-filter: blur(12px);
+  width: 32px !important;
+  height: 32px !important;
+  line-height: 32px !important;
+  transition: all 0.2s ease;
+}
+
+.leaflet-bar a:hover {
+  background-color: rgba(30, 30, 38, 0.95) !important;
+  color: #00D2FF !important;
+}
+
+/* Dark glass Leaflet popup */
+.leaflet-popup-content-wrapper {
+  background: rgba(10, 10, 14, 0.95) !important;
+  backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 1rem !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8), 0 0 25px rgba(0, 210, 255, 0.15) !important;
+  color: #EDEDED !important;
+  padding: 0 !important;
+}
+
+.leaflet-popup-content {
+  margin: 14px 16px !important;
+  line-height: 1.4 !important;
+}
+
+.leaflet-popup-tip {
+  background: rgba(10, 10, 14, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+}
+
+/* Custom pulsing radar marker classes for Leaflet DivIcon */
+.marker-radar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.marker-radar-ring {
+  position: absolute;
+  inset: -6px;
+  border-radius: 9999px;
+  animation: radar-ping 2.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+  pointer-events: none;
+}
+
+@keyframes radar-ping {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.8;
   }
-  50% {
-    box-shadow: 0 0 25px rgba(0, 210, 255, 0.6), 0 0 45px rgba(0, 210, 255, 0.3);
+  75%, 100% {
+    transform: scale(2.4);
+    opacity: 0;
   }
-}
-
-.animate-neon-glow {
-  animation: neon-glow 3s infinite ease-in-out;
-}
-
-/* Glassmorphism helpers */
-.glass-panel {
-  background: rgba(18, 18, 22, 0.7);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-}
-
-.glass-panel-hover {
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.glass-panel-hover:hover {
-  background: rgba(24, 24, 30, 0.85);
-  border-color: rgba(0, 210, 255, 0.25);
-  transform: translateY(-1px);
 }
 
 /* Custom sleek scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #0A0A0B;
+  background: #000000;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #22222a;
+  background: #181820;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #333340;
+  background: #2a2a38;
 }
