@@ -52,14 +52,17 @@ router.get('/', async (req, res, next) => {
 router.post('/text', submissionRateLimiter, sanitizeCitizenInput, async (req, res, next) => {
   try {
     const startTime = Date.now();
-    const { raw_text, region_name, latitude, longitude, raw_input_type = 'text' } = req.body;
+    const textInput = req.body.raw_text || req.body.text;
+    const { region_name, latitude, longitude, raw_input_type = 'text' } = req.body;
 
-    if (!raw_text || typeof raw_text !== 'string' || !raw_text.trim()) {
+    if (!textInput || typeof textInput !== 'string' || !textInput.trim()) {
       return res.status(400).json({
         success: false,
-        error: 'Validation failed: raw_text is required and cannot be empty.',
+        error: 'Validation failed: raw_text (or text) is required and cannot be empty.',
       });
     }
+
+    const raw_text = textInput;
 
     // 1. LLM Reasoning & Classification Call
     const aiResult = await classifyComplaint(raw_text);

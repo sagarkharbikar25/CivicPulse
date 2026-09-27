@@ -73,16 +73,17 @@ export function sanitizeCitizenInput(req, res, next) {
 
   const { raw_text, category, region_name, latitude, longitude } = req.body;
 
-  // Validate raw_text presence and length
+  // Validate raw_text presence and length (supports both raw_text and text aliases)
   if (req.method === 'POST' && req.path.includes('/text')) {
-    if (!raw_text || typeof raw_text !== 'string' || !raw_text.trim()) {
+    const textContent = req.body.raw_text || req.body.text;
+    if (!textContent || typeof textContent !== 'string' || !textContent.trim()) {
       return res.status(400).json({
         success: false,
-        error: 'Validation failed: raw_text is required and cannot be empty.',
+        error: 'Validation failed: raw_text (or text) is required and cannot be empty.',
       });
     }
 
-    if (raw_text.length > 2000) {
+    if (textContent.length > 2000) {
       return res.status(400).json({
         success: false,
         error: 'Validation failed: raw_text exceeds maximum allowed length of 2000 characters.',
@@ -90,7 +91,7 @@ export function sanitizeCitizenInput(req, res, next) {
     }
 
     // Strip HTML/Script vectors to prevent Stored XSS
-    req.body.raw_text = raw_text
+    req.body.raw_text = textContent
       .replace(/<[^>]*>?/gm, '') // Remove HTML tags
       .replace(/javascript:/gi, '')
       .replace(/onerror\s*=/gi, '')
