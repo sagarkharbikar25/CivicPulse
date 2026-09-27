@@ -35,7 +35,7 @@ export default function PolicymakerView({ priorities = [], onRecompute, isRecomp
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/[0.08] pb-6">
         <div>
           <div className="inline-flex items-center gap-2 glass-pill px-3 py-1 rounded-full text-[10px] font-mono text-slate-300 mb-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+            <span className="w-1.5 h-1.5 rounded-full bg-white shadow-glow-white" />
             <span>GOVERNANCE DECISION SUPPORT • BRICS DPI</span>
           </div>
           <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl font-normal text-white tracking-tight">
@@ -63,7 +63,7 @@ export default function PolicymakerView({ priorities = [], onRecompute, isRecomp
         <div className="light-slit absolute top-0 inset-x-0" />
         <div className="flex items-center gap-3.5">
           <div className="w-10 h-10 rounded-full bg-white/10 border border-white/20 text-white flex items-center justify-center shrink-0">
-            <PulseIcon className="w-5 h-5 text-cyan-400" />
+            <PulseIcon className="w-5 h-5 text-white" />
           </div>
           <div>
             <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono">
@@ -173,7 +173,7 @@ export default function PolicymakerView({ priorities = [], onRecompute, isRecomp
                           className={`h-full rounded-full ${
                             item.avg_urgency >= 85
                               ? 'bg-gradient-to-r from-amber-400 to-rose-500'
-                              : 'bg-gradient-to-r from-cyan-400 to-amber-400'
+                              : 'bg-gradient-to-r from-slate-200 to-amber-400'
                           }`}
                           style={{ width: `${item.avg_urgency}%` }}
                         />

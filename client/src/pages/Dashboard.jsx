@@ -74,7 +74,7 @@ export default function Dashboard({
           onClick={onNavigateSubmit}
           className="glass-pill glass-pill-hover px-4 py-1.5 rounded-full text-xs font-medium text-slate-300 hover:text-white flex items-center gap-2 mb-6 cursor-pointer"
         >
-          <span className="text-cyan-400">⚡</span>
+          <span className="text-white text-[11px]">✦</span>
           <span>Speak it. See it prioritized in 5 seconds.</span>
           <span className="text-slate-400">→</span>
         </button>
@@ -110,39 +110,35 @@ export default function Dashboard({
         </div>
       </section>
 
-      {/* METRICS COUNTER ROW */}
+      {/* METRICS COUNTER ROW (Redesigned with frosted monochrome icons) */}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatPill
           icon={PulseIcon}
-          label="Total Grievances Ingested"
+          label="Total Grievances"
           value={submissions.length + 138}
           subvalue="across 7 sectors"
           trend="+18% vs avg"
-          trendType="neutral"
         />
         <StatPill
           icon={AlertIcon}
-          label="Critical Priority Clusters"
+          label="Critical Clusters"
           value={priorities.filter(p => p.avg_urgency >= 85).length || 2}
-          subvalue="immediate deployment"
+          subvalue="action required"
           trend="Severe"
-          trendType="negative"
         />
         <StatPill
           icon={RoadIcon}
-          label="Mean Algorithmic Urgency"
+          label="Mean Urgency"
           value="84.2"
-          subvalue="composite index / 100"
-          trend="Target &lt;60"
-          trendType="positive"
+          subvalue="composite index"
+          trend="Target <60"
         />
         <StatPill
           icon={WaterIcon}
-          label="Multilingual Pipeline"
+          label="Multilingual AI"
           value="3 Langs"
           subvalue="Hindi, Marathi, English"
           trend="1.2s Latency"
-          trendType="positive"
         />
       </section>
 
@@ -165,8 +161,8 @@ export default function Dashboard({
               <div className="flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-cyan-400" />
-                    <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                    <span className="w-2 h-2 rounded-full bg-white shadow-glow-white" />
+                    <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
                       Regional Sector: {selectedNode.name}
                     </h3>
                   </div>
@@ -177,7 +173,7 @@ export default function Dashboard({
 
                 <div className="text-right">
                   <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-mono">Urgency Score</span>
-                  <span className="text-xl font-bold font-mono text-cyan-300">
+                  <span className="text-xl font-bold font-mono text-white">
                     {selectedNode.intensity}/100
                   </span>
                 </div>
@@ -186,32 +182,32 @@ export default function Dashboard({
               {/* Progress metrics */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-5 pt-4 border-t border-white/[0.08]">
                 <div>
-                  <span className="text-[11px] text-slate-400 block mb-1">Infrastructure Deficit</span>
+                  <span className="text-[11px] text-slate-400 block mb-1 font-mono">Infrastructure Deficit</span>
                   <div className="w-full bg-white/5 rounded-full h-1.5 overflow-hidden">
                     <div
                       className="bg-amber-400 h-full rounded-full transition-all duration-500"
                       style={{ width: `${selectedNode.gapScore || 70}%` }}
                     />
                   </div>
-                  <span className="text-[11px] font-mono text-amber-300 mt-1 block">{selectedNode.gapScore}% gap score</span>
+                  <span className="text-[11px] font-mono text-slate-300 mt-1 block">{selectedNode.gapScore}% deficit</span>
                 </div>
 
                 <div>
-                  <span className="text-[11px] text-slate-400 block mb-1">Impacted Citizens</span>
+                  <span className="text-[11px] text-slate-400 block mb-1 font-mono">Impacted Citizens</span>
                   <div className="w-full bg-white/5 rounded-full h-1.5 overflow-hidden">
-                    <div className="bg-cyan-400 h-full rounded-full" style={{ width: '68%' }} />
+                    <div className="bg-white/80 h-full rounded-full" style={{ width: '68%' }} />
                   </div>
-                  <span className="text-[11px] font-mono text-cyan-300 mt-1 block">
+                  <span className="text-[11px] font-mono text-slate-300 mt-1 block">
                     {(selectedNode.population || 85000).toLocaleString()} residents
                   </span>
                 </div>
 
                 <div>
-                  <span className="text-[11px] text-slate-400 block mb-1">Active Clustered Reports</span>
+                  <span className="text-[11px] text-slate-400 block mb-1 font-mono">Active Clustered Reports</span>
                   <div className="w-full bg-white/5 rounded-full h-1.5 overflow-hidden">
-                    <div className="bg-rose-400 h-full rounded-full" style={{ width: '85%' }} />
+                    <div className="bg-white h-full rounded-full" style={{ width: '85%' }} />
                   </div>
-                  <span className="text-[11px] font-mono text-rose-300 mt-1 block">
+                  <span className="text-[11px] font-mono text-slate-300 mt-1 block">
                     {selectedNode.submissionsCount || 12} citizen complaints
                   </span>
                 </div>
@@ -226,7 +222,7 @@ export default function Dashboard({
             <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
               <div>
                 <h3 className="text-sm font-semibold text-white tracking-tight">Live Ingested Transcripts</h3>
-                <p className="text-xs text-slate-400">Translated and categorized in real time</p>
+                <p className="text-xs text-slate-400 font-light">Translated and categorized in real time</p>
               </div>
               <span className="text-xs font-mono text-slate-400">{filteredSubmissions.length} indexed</span>
             </div>
@@ -264,7 +260,7 @@ export default function Dashboard({
                         {sub.raw_input_type}
                       </span>
                       {sub.language_detected && (
-                        <span className="text-[10px] font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20">
+                        <span className="text-[10px] font-mono text-slate-300 bg-white/[0.05] px-2 py-0.5 rounded-full border border-white/10">
                           {sub.language_detected}
                         </span>
                       )}
@@ -272,20 +268,20 @@ export default function Dashboard({
                     <Badge urgencyScore={sub.urgency_score} />
                   </div>
 
-                  <p className="text-xs text-slate-200 leading-relaxed font-normal">
+                  <p className="text-xs text-slate-200 leading-relaxed font-light">
                     "{sub.translated_text}"
                   </p>
 
                   {sub.language_detected && sub.language_detected.toLowerCase() !== 'english' && (
-                    <div className="text-[11px] text-slate-400 italic bg-black/40 p-2 rounded-lg border border-white/5">
+                    <div className="text-[11px] text-slate-400 italic bg-black/40 p-2 rounded-lg border border-white/5 font-light">
                       <span className="text-slate-400 not-italic mr-1 text-[10px] uppercase font-mono">Original:</span>
                       "{sub.raw_text}"
                     </div>
                   )}
 
-                  <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-white/[0.04]">
-                    <span className="truncate">{sub.region_name}</span>
-                    <span className="font-mono text-[10px] text-slate-400">
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-white/[0.04] font-mono">
+                    <span className="truncate text-slate-400">{sub.region_name}</span>
+                    <span className="text-[10px]">
                       {new Date(sub.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>

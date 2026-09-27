@@ -12,11 +12,11 @@ export default function SubmitComplaint({ regions = [], onComplaintSubmitted, on
   const [submittedResult, setSubmittedResult] = useState(null);
 
   const categories = [
-    { id: 'water', label: 'Water & Sewage', icon: WaterIcon, color: 'text-cyan-400' },
-    { id: 'roads', label: 'Roads & Transit', icon: RoadIcon, color: 'text-amber-400' },
-    { id: 'electricity', label: 'Power & Grid', icon: ElectricityIcon, color: 'text-yellow-400' },
-    { id: 'sanitation', label: 'Waste & Sanitation', icon: SanitationIcon, color: 'text-emerald-400' },
-    { id: 'other', label: 'Public Infrastructure', icon: AlertIcon, color: 'text-purple-400' },
+    { id: 'water', label: 'Water & Sewage', icon: WaterIcon },
+    { id: 'roads', label: 'Roads & Transit', icon: RoadIcon },
+    { id: 'electricity', label: 'Power & Grid', icon: ElectricityIcon },
+    { id: 'sanitation', label: 'Waste & Sanitation', icon: SanitationIcon },
+    { id: 'other', label: 'Public Infrastructure', icon: AlertIcon },
   ];
 
   const presets = [
@@ -86,7 +86,7 @@ export default function SubmitComplaint({ regions = [], onComplaintSubmitted, on
       {/* Hero Header with Serif Headline */}
       <div className="text-center space-y-3">
         <div className="inline-flex items-center gap-2 glass-pill px-4 py-1.5 rounded-full text-xs font-mono text-slate-300">
-          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+          <span className="w-1.5 h-1.5 rounded-full bg-white shadow-glow-white animate-pulse" />
           <span>DIRECT CITIZEN INGESTION PORTAL</span>
         </div>
         <h2 className="font-serif text-4xl sm:text-5xl font-normal text-white tracking-tight">
@@ -104,7 +104,7 @@ export default function SubmitComplaint({ regions = [], onComplaintSubmitted, on
           <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider font-mono">
             Demo Presets (Instant Multilingual Test Cases)
           </span>
-          <span className="text-[11px] text-slate-500">Click to autofill</span>
+          <span className="text-[11px] text-slate-500 font-mono">Click to autofill</span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {presets.map((preset, idx) => (
@@ -146,7 +146,7 @@ export default function SubmitComplaint({ regions = [], onComplaintSubmitted, on
                 Grievance Indexed & <span className="italic">Prioritized</span>
               </h3>
               <p className="text-xs text-slate-400 font-light">
-                Multilingual AI inference pipeline completed in <span className="text-cyan-400 font-mono font-bold">1.2s</span>.
+                Multilingual AI inference pipeline completed in <span className="text-white font-mono font-bold">1.2s</span>.
               </p>
             </div>
 
@@ -209,7 +209,7 @@ export default function SubmitComplaint({ regions = [], onComplaintSubmitted, on
                   ))}
                 </select>
                 <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                  <MapPinIcon className="w-4 h-4 text-cyan-400" />
+                  <MapPinIcon className="w-4 h-4 text-white/70" />
                 </div>
               </div>
             </div>
@@ -232,11 +232,11 @@ export default function SubmitComplaint({ regions = [], onComplaintSubmitted, on
                         flex flex-col items-center justify-center p-3.5 rounded-xl border text-center transition-all cursor-pointer
                         ${isSelected
                           ? 'bg-white text-black font-semibold border-white shadow-glow-white scale-[1.02]'
-                          : 'bg-[#121217] border-white/10 text-slate-400 hover:text-white hover:border-white/20'
+                          : 'bg-[#121217] border-white/10 text-slate-300 hover:text-white hover:border-white/20'
                         }
                       `}
                     >
-                      <Icon className={`w-5 h-5 mb-1.5 ${isSelected ? 'text-black' : cat.color}`} />
+                      <Icon className={`w-5 h-5 mb-1.5 ${isSelected ? 'text-black' : 'text-slate-300'}`} />
                       <span className="text-xs">{cat.label}</span>
                     </button>
                   );

@@ -9,35 +9,15 @@ export default function Badge({
   className = '',
   ...props
 }) {
-  // If category is provided, render matching category styling and icon
+  // Category badges with luxury monochrome frosted styling
   if (category) {
     const cat = category.toLowerCase();
     const config = {
-      roads: {
-        label: 'Roads & Transit',
-        icon: RoadIcon,
-        style: 'bg-amber-500/10 text-amber-300 border-amber-500/25',
-      },
-      water: {
-        label: 'Water & Sewage',
-        icon: WaterIcon,
-        style: 'bg-cyan-500/10 text-cyan-300 border-cyan-500/25',
-      },
-      electricity: {
-        label: 'Power & Grid',
-        icon: ElectricityIcon,
-        style: 'bg-yellow-500/10 text-yellow-300 border-yellow-500/25',
-      },
-      sanitation: {
-        label: 'Sanitation & Waste',
-        icon: SanitationIcon,
-        style: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25',
-      },
-      other: {
-        label: 'Public Infrastructure',
-        icon: AlertIcon,
-        style: 'bg-slate-500/10 text-slate-300 border-slate-500/25',
-      },
+      roads: { label: 'Roads & Transit', icon: RoadIcon },
+      water: { label: 'Water & Sewage', icon: WaterIcon },
+      electricity: { label: 'Power & Grid', icon: ElectricityIcon },
+      sanitation: { label: 'Sanitation & Waste', icon: SanitationIcon },
+      other: { label: 'Infrastructure', icon: AlertIcon },
     };
 
     const current = config[cat] || config.other;
@@ -45,52 +25,48 @@ export default function Badge({
 
     return (
       <span
-        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${current.style} ${className}`}
+        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium bg-white/[0.04] text-slate-200 border border-white/10 transition-colors hover:border-white/20 ${className}`}
         {...props}
       >
-        <IconComp className="w-3.5 h-3.5 shrink-0" />
+        <IconComp className="w-3.5 h-3.5 text-white/80 shrink-0" />
         {children || current.label}
       </span>
     );
   }
 
-  // If urgencyScore is provided (0-100)
+  // Urgency score badges
   if (urgencyScore !== undefined) {
-    let scoreStyle = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
-    let label = 'Low Priority';
+    let scoreStyle = 'bg-white/[0.03] text-slate-400 border-white/5';
+    let label = 'Standard';
 
-    if (urgencyScore >= 75) {
-      scoreStyle = 'bg-rose-500/15 text-rose-400 border-rose-500/40 shadow-sm shadow-rose-500/20';
-      label = 'Critical Priority';
-    } else if (urgencyScore >= 50) {
-      scoreStyle = 'bg-amber-500/15 text-amber-300 border-amber-500/30';
-      label = 'Moderate Priority';
+    if (urgencyScore >= 85) {
+      scoreStyle = 'bg-white/[0.08] text-white border-white/20 shadow-sm shadow-white/10';
+      label = 'Critical';
+    } else if (urgencyScore >= 60) {
+      scoreStyle = 'bg-white/[0.05] text-slate-200 border-white/10';
+      label = 'Elevated';
     }
 
     return (
       <span
-        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold tracking-wide border ${scoreStyle} ${className}`}
+        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-medium border ${scoreStyle} ${className}`}
         {...props}
       >
-        <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
-        {children || `${label} (${Math.round(urgencyScore)})`}
+        <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+        {children || `${label} ${Math.round(urgencyScore)}`}
       </span>
     );
   }
 
-  // General variants
   const variants = {
-    default: 'bg-white/[0.06] text-slate-300 border-white/10',
-    cyan: 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30',
-    blue: 'bg-blue-500/10 text-blue-300 border-blue-500/30',
-    amber: 'bg-amber-500/10 text-amber-300 border-amber-500/30',
-    rose: 'bg-rose-500/10 text-rose-300 border-rose-500/30',
-    emerald: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
+    default: 'bg-white/[0.05] text-slate-200 border-white/10',
+    white: 'bg-white text-black font-semibold',
+    ghost: 'bg-transparent text-slate-400 border-white/5',
   };
 
   return (
     <span
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${variants[variant] || variants.default} ${className}`}
+      className={`inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium border ${variants[variant] || variants.default} ${className}`}
       {...props}
     >
       {children}

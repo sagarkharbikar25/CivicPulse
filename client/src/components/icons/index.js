@@ -12,3 +12,4 @@ export { default as ChevronIcon } from './ChevronIcon';
 export { default as SendIcon } from './SendIcon';
 export { default as RefreshIcon } from './RefreshIcon';
 export { default as LayersIcon } from './LayersIcon';
+export { default as CivicPulseLogo } from './CivicPulseLogo';

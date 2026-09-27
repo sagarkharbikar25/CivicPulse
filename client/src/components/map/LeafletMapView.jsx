@@ -20,7 +20,6 @@ export default function LeafletMapView({
     if (!mapContainerRef.current) return;
     if (mapInstanceRef.current) return;
 
-    // Centered initially over the seed data coordinates (Nagpur / Central India corridor)
     const initialLat = 21.1458;
     const initialLng = 79.0882;
 
@@ -31,10 +30,8 @@ export default function LeafletMapView({
       attributionControl: false,
     });
 
-    // Custom positioned zoom control in bottom right
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    // CartoDB Dark Matter luxury dark tiles
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       maxZoom: 19,
       subdomains: 'abcd',
@@ -49,12 +46,11 @@ export default function LeafletMapView({
     };
   }, []);
 
-  // Update Markers whenever points, activeLayer, or selectedPointId change
+  // Update Markers
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map || !mapReady || !points || points.length === 0) return;
 
-    // Clear existing markers
     markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
 
@@ -64,10 +60,9 @@ export default function LeafletMapView({
       const isSelected = selectedPointId === point.id;
       const intensity = activeLayer === 'infra_gap' ? point.gapScore : point.intensity;
 
-      // Determine colors based on tier
-      let bgGrad = 'from-cyan-500 to-blue-600';
-      let borderColor = '#00D2FF';
-      let ringColor = 'rgba(0, 210, 255, 0.4)';
+      let bgGrad = 'from-slate-200 to-white';
+      let borderColor = '#ffffff';
+      let ringColor = 'rgba(255, 255, 255, 0.4)';
       let isCritical = intensity >= 80;
 
       if (intensity >= 85) {
@@ -80,7 +75,6 @@ export default function LeafletMapView({
         ringColor = 'rgba(245, 158, 11, 0.45)';
       }
 
-      // Create Custom HTML DivIcon
       const iconHtml = `
         <div class="marker-radar cursor-pointer group" style="width: 44px; height: 44px;">
           ${isCritical ? `<div class="marker-radar-ring" style="background: ${ringColor};"></div>` : ''}
@@ -102,28 +96,27 @@ export default function LeafletMapView({
 
       const marker = L.marker([point.latitude, point.longitude], { icon: customIcon }).addTo(map);
 
-      // Popup Content matching the sleek dark luxury aesthetic
       const popupHtml = `
         <div class="p-1 space-y-2 font-sans select-none min-w-[210px]">
           <div class="flex items-center justify-between border-b border-white/10 pb-1.5">
-            <span class="text-xs font-bold text-white tracking-wide uppercase">${point.name}</span>
-            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-cyan-300 border border-white/10">
+            <span class="text-xs font-bold text-white tracking-wide uppercase font-mono">${point.name}</span>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/10 text-white border border-white/15">
               ${intensity}/100
             </span>
           </div>
           <div class="grid grid-cols-2 gap-1.5 text-[11px]">
             <div>
-              <span class="text-slate-400 block text-[9px] uppercase tracking-wider">Infra Gap</span>
+              <span class="text-slate-400 block text-[9px] uppercase tracking-wider font-mono">Infra Gap</span>
               <span class="text-amber-400 font-semibold font-mono">${point.gapScore}%</span>
             </div>
             <div>
-              <span class="text-slate-400 block text-[9px] uppercase tracking-wider">Reports</span>
-              <span class="text-cyan-400 font-semibold font-mono">${point.submissionsCount || 0} active</span>
+              <span class="text-slate-400 block text-[9px] uppercase tracking-wider font-mono">Reports</span>
+              <span class="text-white font-semibold font-mono">${point.submissionsCount || 0} active</span>
             </div>
           </div>
-          <div class="pt-1 border-t border-white/5 flex items-center justify-between text-[10px] text-slate-400">
+          <div class="pt-1 border-t border-white/5 flex items-center justify-between text-[10px] text-slate-400 font-mono">
             <span>Pop: ${(point.population || 0).toLocaleString()}</span>
-            <span class="text-emerald-400 font-medium">Prioritized</span>
+            <span class="text-slate-200 font-medium">Prioritized</span>
           </div>
         </div>
       `;
@@ -138,13 +131,11 @@ export default function LeafletMapView({
       bounds.extend([point.latitude, point.longitude]);
     });
 
-    // Fit map bounds smoothly on initial load if points exist
     if (bounds.isValid()) {
       map.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
     }
   }, [points, activeLayer, selectedPointId, mapReady]);
 
-  // Recenter helper
   const handleRecenter = () => {
     const map = mapInstanceRef.current;
     if (!map || markersRef.current.length === 0) return;
@@ -158,9 +149,9 @@ export default function LeafletMapView({
       <div className="absolute top-4 left-4 right-4 z-[400] flex items-center justify-between pointer-events-none">
         {/* Status Pill */}
         <div className="pointer-events-auto flex items-center gap-2.5 glass-pill px-3.5 py-1.5 rounded-full text-xs">
-          <div className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
-          <span className="font-semibold text-white tracking-wide uppercase text-[11px]">
-            Leaflet Geospatial Cartography
+          <div className="w-2 h-2 rounded-full bg-white shadow-glow-white animate-ping" />
+          <span className="font-semibold text-white tracking-wide uppercase text-[11px] font-mono">
+            Leaflet Cartography
           </span>
           <span className="text-white/20">|</span>
           <span className="text-slate-400 font-mono text-[10px]">{points.length} nodes active</span>
@@ -205,7 +196,7 @@ export default function LeafletMapView({
       <div ref={mapContainerRef} className="w-full h-[480px] z-10" />
 
       {/* Bottom Map Legend */}
-      <div className="px-5 py-3 bg-[#08080C]/90 border-t border-white/[0.08] flex flex-wrap items-center justify-between gap-3 text-xs z-[400] relative">
+      <div className="px-5 py-3 bg-[#08080C]/90 border-t border-white/[0.08] flex flex-wrap items-center justify-between gap-3 text-xs z-[400] relative font-mono">
         <div className="flex items-center gap-4 text-slate-400">
           <span className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider">Tiers:</span>
           <div className="flex items-center gap-1.5">
@@ -217,7 +208,7 @@ export default function LeafletMapView({
             <span className="text-slate-300 text-[11px]">Elevated (65–84)</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-sm shadow-cyan-400/50" />
+            <span className="w-2.5 h-2.5 rounded-full bg-white shadow-sm shadow-white/50" />
             <span className="text-slate-300 text-[11px]">Monitored (&lt;65)</span>
           </div>
         </div>

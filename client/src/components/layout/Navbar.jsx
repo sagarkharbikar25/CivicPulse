@@ -1,5 +1,5 @@
 import React from 'react';
-import { PulseIcon, RefreshIcon, MapPinIcon, SendIcon } from '../icons';
+import { PulseIcon, RefreshIcon, MapPinIcon, SendIcon, CivicPulseLogo } from '../icons';
 
 export default function Navbar({ activeTab, setActiveTab, onRecompute, isRecomputing }) {
   const tabs = [
@@ -13,11 +13,11 @@ export default function Navbar({ activeTab, setActiveTab, onRecompute, isRecompu
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         {/* Left: Brand Logo & Title */}
         <div
-          className="flex items-center gap-3 cursor-pointer group"
+          className="flex items-center gap-2.5 cursor-pointer group"
           onClick={() => setActiveTab('dashboard')}
         >
-          <div className="relative w-9 h-9 rounded-full overflow-hidden border border-white/20 p-0.5 shadow-glow-white/20 bg-black transition-transform duration-200 group-hover:scale-105">
-            <img src="/civicpulse.png" alt="CivicPulse" className="w-full h-full object-cover rounded-full" />
+          <div className="transition-transform duration-200 group-hover:scale-105">
+            <CivicPulseLogo className="w-8 h-8 drop-shadow-[0_0_12px_rgba(255,255,255,0.4)]" />
           </div>
           <div>
             <div className="flex items-center gap-1.5">
