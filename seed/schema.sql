@@ -55,3 +55,43 @@ create index if not exists idx_submissions_status on submissions(status);
 create index if not exists idx_submissions_urgency on submissions(urgency_score desc);
 create index if not exists idx_submissions_created_at on submissions(created_at desc);
 create index if not exists idx_priority_projects_rank on priority_projects(final_priority_rank);
+
+-- ==============================================================================
+-- 5. Row Level Security (RLS) Policies
+-- ==============================================================================
+
+-- Enable RLS on all tables
+alter table submissions enable row level security;
+alter table region_index enable row level security;
+alter table priority_projects enable row level security;
+
+-- Submissions policies: Public can read all submissions and insert new complaints
+create policy "Public can read submissions"
+  on submissions for select
+  using (true);
+
+create policy "Public can insert citizen complaints"
+  on submissions for insert
+  with check (
+    status in ('new', 'reviewed', 'prioritized') and
+    raw_input_type in ('voice', 'text', 'chat')
+  );
+
+-- Region index policies: Public can read demographics, modifications restricted
+create policy "Public can read regions"
+  on region_index for select
+  using (true);
+
+create policy "Service role can modify regions"
+  on region_index for all
+  using (auth.role() = 'service_role');
+
+-- Priority projects policies: Public can read rankings, updates restricted
+create policy "Public can read priority projects"
+  on priority_projects for select
+  using (true);
+
+create policy "Service role can modify priority projects"
+  on priority_projects for all
+  using (auth.role() = 'service_role');
+

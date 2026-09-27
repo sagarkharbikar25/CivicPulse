@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { getSubmissions, createSubmission, getRegions } from '../db/supabaseAdmin.js';
 import { computeUrgencyScore } from '../services/scoringEngine.js';
+import { submissionRateLimiter, sanitizeCitizenInput } from '../middleware/security.js';
 
 const router = Router();
 
@@ -32,9 +33,9 @@ router.get('/', async (req, res, next) => {
 /**
  * POST /api/submissions/text
  * Day 1 Stub: Accepts citizen text report, calculates urgency score, and stores in database.
- * (Full AI entity classification and translation wires in Day 2: feature/ai-integration)
+ * Protected by submissionRateLimiter and sanitizeCitizenInput
  */
-router.post('/text', async (req, res, next) => {
+router.post('/text', submissionRateLimiter, sanitizeCitizenInput, async (req, res, next) => {
   try {
     const { raw_text, region_name, category, latitude, longitude, raw_input_type = 'text' } = req.body;
 
@@ -84,7 +85,7 @@ router.post('/text', async (req, res, next) => {
  * Day 1 Stub: Confirms voice endpoint route readiness.
  * (Full Whisper STT audio processing wires in Day 2: feature/ai-integration)
  */
-router.post('/voice', (req, res) => {
+router.post('/voice', submissionRateLimiter, (req, res) => {
   res.status(202).json({
     success: true,
     message: 'Voice ingestion stub ready. Multilingual Whisper transcription pipeline activates in feature/ai-integration.',

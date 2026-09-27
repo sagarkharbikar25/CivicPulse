@@ -32,13 +32,15 @@ async function runTests() {
   console.log(`Test server running at ${baseUrl}\n`);
 
   try {
-    // 1. Health check
-    console.log('Test 1: Health Check (GET /api/health)');
+    // 1. Health check & Security Headers
+    console.log('Test 1: Health Check & Security Headers (GET /api/health)');
     const resHealth = await fetch(`${baseUrl}/api/health`);
     const dataHealth = await resHealth.json();
     assert(resHealth.status === 200, 'Health endpoint returns 200 OK');
     assert(dataHealth.status === 'ok', 'Status is "ok"');
     assert(dataHealth.branch === 'feature/core-backend', 'Reports correct branch');
+    assert(resHealth.headers.get('x-frame-options') === 'DENY', 'Security Header: X-Frame-Options is DENY');
+    assert(resHealth.headers.get('x-content-type-options') === 'nosniff', 'Security Header: X-Content-Type-Options is nosniff');
 
     // 2. Regions
     console.log('\nTest 2: Regions Data (GET /api/regions)');
@@ -83,13 +85,13 @@ async function runTests() {
       assert(feat.properties.weight >= 0 && feat.properties.weight <= 1.0, 'Weight is normalized between 0.0 and 1.0');
     }
 
-    // 6. Text Submission POST
-    console.log('\nTest 6: Submit Text Complaint (POST /api/submissions/text)');
+    // 6. Text Submission POST & XSS Sanitization
+    console.log('\nTest 6: Submit Text Complaint & XSS Sanitization (POST /api/submissions/text)');
     const resPostText = await fetch(`${baseUrl}/api/submissions/text`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        raw_text: 'Severely damaged storm drainage overflowing near Kurla station platform 1.',
+        raw_text: "<script>alert('xss')</script>Severely damaged storm drainage overflowing near Kurla station platform 1.",
         category: 'water',
         region_name: 'Ward 9 - Kurla West / LBS Marg',
       }),
@@ -97,9 +99,19 @@ async function runTests() {
     const dataPostText = await resPostText.json();
     assert(resPostText.status === 201, 'Text submission returns 201 Created');
     assert(dataPostText.data.urgency_score > 0, `Auto-calculated urgency score: ${dataPostText.data?.urgency_score}`);
+    assert(!dataPostText.data.raw_text.includes('<script>'), 'XSS Sanitization: Script tag stripped from raw_text');
 
-    // 7. Voice Submission Stub POST
-    console.log('\nTest 7: Voice Submission Stub (POST /api/submissions/voice)');
+    // 7. Input Validation Rejection
+    console.log('\nTest 7: Input Validation on Empty Content');
+    const resPostEmpty = await fetch(`${baseUrl}/api/submissions/text`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ raw_text: '   ' }),
+    });
+    assert(resPostEmpty.status === 400, 'Empty raw_text is rejected with 400 Bad Request');
+
+    // 8. Voice Submission Stub POST
+    console.log('\nTest 8: Voice Submission Stub (POST /api/submissions/voice)');
     const resPostVoice = await fetch(`${baseUrl}/api/submissions/voice`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -109,12 +121,18 @@ async function runTests() {
     assert(resPostVoice.status === 202, 'Voice stub returns 202 Accepted');
     assert(dataPostVoice.status === 'stubbed_day_1', 'Reports stubbed_day_1 status');
 
-    // 8. Admin Recompute POST
-    console.log('\nTest 8: Admin Recompute (POST /api/admin/recompute)');
-    const resRecompute = await fetch(`${baseUrl}/api/admin/recompute`, { method: 'POST' });
-    const dataRecompute = await resRecompute.json();
-    assert(resRecompute.status === 200, 'Recompute returns 200 OK');
-    assert(dataRecompute.result?.success === true, 'Recompute reports success');
+    // 9. Admin Security Guard & Recompute POST
+    console.log('\nTest 9: Admin Endpoint Authentication Guard');
+    const resRecomputeUnauth = await fetch(`${baseUrl}/api/admin/recompute`, { method: 'POST' });
+    assert(resRecomputeUnauth.status === 401, 'Admin recompute rejects request without x-admin-key (401 Unauthorized)');
+
+    const resRecomputeAuth = await fetch(`${baseUrl}/api/admin/recompute`, {
+      method: 'POST',
+      headers: { 'x-admin-key': 'civicpulse-admin-dev-key' },
+    });
+    const dataRecomputeAuth = await resRecomputeAuth.json();
+    assert(resRecomputeAuth.status === 200, 'Admin recompute succeeds with valid x-admin-key (200 OK)');
+    assert(dataRecomputeAuth.result?.success === true, 'Recompute reports success');
 
   } catch (err) {
     console.error('Test execution error:', err);

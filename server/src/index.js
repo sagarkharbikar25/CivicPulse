@@ -7,20 +7,27 @@ import priorityRouter from './routes/priority.js';
 import regionsRouter from './routes/regions.js';
 import adminRouter from './routes/admin.js';
 import { isSupabaseConfigured } from './db/supabaseAdmin.js';
+import { helmetMiddleware, generalRateLimiter } from './middleware/security.js';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware
+// Security Headers & Rate Limiting
+app.use(helmetMiddleware);
+app.use(generalRateLimiter);
+
+// CORS configuration
 app.use(cors({
-  origin: '*',
+  origin: process.env.CLIENT_ORIGIN || '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-key'],
 }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+
+// Payload size limit to prevent memory exhaustion DoS
+app.use(express.json({ limit: '100kb' }));
+app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 
 // Request logging in development
 app.use((req, res, next) => {
