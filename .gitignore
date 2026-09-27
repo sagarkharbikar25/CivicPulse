@@ -1,6 +1,8 @@
 # Environment files
 .env
 .env.*
+!.env.example
+!*.example
 server/.env
 client/.env
 
