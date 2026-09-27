@@ -3,6 +3,8 @@
  * Tests all 5 core endpoints + health and stubs against Express server.
  */
 
+process.env.NODE_ENV = 'test';
+
 import http from 'http';
 import app from '../src/index.js';
 

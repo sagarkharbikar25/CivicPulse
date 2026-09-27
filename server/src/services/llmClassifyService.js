@@ -65,8 +65,8 @@ export async function classifyComplaint(rawText) {
 
   const cleanText = rawText.trim();
 
-  // 1. Attempt LLM API call if key is configured
-  if (LLM_API_KEY) {
+  // 1. Attempt LLM API call if key is configured and not running in automated test mode
+  if (LLM_API_KEY && process.env.NODE_ENV !== 'test') {
     try {
       const llmResult = await executeRemoteLlmCall(cleanText);
       if (llmResult && isValidClassification(llmResult)) {

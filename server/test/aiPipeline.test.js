@@ -11,6 +11,8 @@
  * 6. Graceful fallback on LLM failure / timeout
  */
 
+process.env.NODE_ENV = 'test';
+
 import http from 'http';
 import app from '../src/index.js';
 import { classifyComplaint, heuristicClassifyComplaint } from '../src/services/llmClassifyService.js';

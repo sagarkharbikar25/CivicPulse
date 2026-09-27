@@ -35,8 +35,8 @@ export async function generatePolicyRecommendation(project) {
     }
   }
 
-  // 1. Try remote LLM generation if key is present
-  if (LLM_API_KEY) {
+  // 1. Try remote LLM generation if key is present and not running in automated test mode
+  if (LLM_API_KEY && process.env.NODE_ENV !== 'test') {
     try {
       const prompt = `As a municipal public works director, provide EXACTLY ONE direct, actionable, technical sentence instructing contractors on how to fix this civic emergency:
 Ward: ${project.region_name}
