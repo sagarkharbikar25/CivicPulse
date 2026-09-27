@@ -124,3 +124,8 @@ export async function recomputePriorities() {
     return { success: true, count: localPriorities.length, timestamp: new Date().toISOString() };
   }
 }
+
+// Aliases for compatibility
+export const getSubmissions = fetchSubmissions;
+export const getPriorityHeatmap = fetchHeatmapData;
+

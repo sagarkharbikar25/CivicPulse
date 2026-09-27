@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Navbar from './components/layout/Navbar';
 import Dashboard from './pages/Dashboard';
 import SubmitComplaint from './pages/SubmitComplaint';
 import PolicymakerView from './pages/PolicymakerView';
+import { useRealtimeSubmissions } from './hooks/useRealtimeSubmissions';
 import {
   fetchHeatmapData,
   fetchSubmissions,
@@ -19,6 +20,7 @@ export default function App() {
   const [regions, setRegions] = useState([]);
   const [isRecomputing, setIsRecomputing] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
+  const [spotlightPoint, setSpotlightPoint] = useState(null);
 
   // Initial load
   useEffect(() => {
@@ -41,6 +43,59 @@ export default function App() {
     loadInitialData();
   }, []);
 
+  const showToast = useCallback((msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 4000);
+  }, []);
+
+  // Handle incoming live submission from Realtime or manual submission
+  const handleIncomingRecord = useCallback((newSub, options = {}) => {
+    if (!newSub || !newSub.id) return;
+
+    setSubmissions((prev) => {
+      if (prev.some((s) => s.id === newSub.id)) return prev;
+      return [newSub, ...prev];
+    });
+
+    setHeatmapData((prev) =>
+      prev.map((p) => {
+        if (p.name === newSub.region_name || p.id === newSub.region_id) {
+          const newIntensity = Math.min(
+            100,
+            Math.round(((p.intensity || 70) + (newSub.urgency_score || 80)) / 2)
+          );
+          return {
+            ...p,
+            intensity: newIntensity,
+            submissionsCount: (p.submissionsCount || 0) + 1,
+          };
+        }
+        return p;
+      })
+    );
+
+    if (newSub.latitude && newSub.longitude) {
+      setSpotlightPoint({
+        latitude: Number(newSub.latitude),
+        longitude: Number(newSub.longitude),
+        region_name: newSub.region_name,
+        urgency_score: newSub.urgency_score,
+        category: newSub.category,
+      });
+    }
+
+    if (options.showToast !== false) {
+      showToast(`⚡ Realtime: ${newSub.category || 'Grievance'} logged for ${newSub.region_name || 'Ward'} (Urgency: ${newSub.urgency_score || 80}/100)`);
+    }
+  }, [showToast]);
+
+  // Supabase Realtime WebSocket hook + sync
+  useRealtimeSubmissions({
+    onInsert: (newSub) => {
+      handleIncomingRecord(newSub, { showToast: true });
+    },
+  });
+
   const handleRecompute = async () => {
     setIsRecomputing(true);
     try {
@@ -60,28 +115,8 @@ export default function App() {
     }
   };
 
-  const showToast = (msg) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
-
   const handleComplaintSubmitted = (newSub) => {
-    setSubmissions(prev => [newSub, ...prev]);
-
-    setHeatmapData(prev =>
-      prev.map(p => {
-        if (p.name === newSub.region_name) {
-          return {
-            ...p,
-            intensity: Math.min(100, Math.round((p.intensity + newSub.urgency_score) / 2)),
-            submissionsCount: (p.submissionsCount || 0) + 1,
-          };
-        }
-        return p;
-      })
-    );
-
-    showToast(`Grievance indexed for ${newSub.region_name} (Urgency: ${newSub.urgency_score})`);
+    handleIncomingRecord(newSub, { showToast: true });
   };
 
   return (
@@ -104,6 +139,7 @@ export default function App() {
             heatmapData={heatmapData}
             submissions={submissions}
             priorities={priorities}
+            spotlightPoint={spotlightPoint}
             onNavigateSubmit={() => setActiveTab('submit')}
             onNavigatePolicymakers={() => setActiveTab('policymakers')}
           />

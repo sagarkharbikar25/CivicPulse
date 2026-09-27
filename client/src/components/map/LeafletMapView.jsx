@@ -6,6 +6,7 @@ export default function LeafletMapView({
   points = [],
   selectedPointId,
   onSelectPoint,
+  spotlightPoint,
   activeLayer = 'urgency',
   onLayerChange,
   className = '',
@@ -53,6 +54,19 @@ export default function LeafletMapView({
       mapInstanceRef.current = null;
     };
   }, []);
+
+  // Spotlight to specific point when citizen report arrives
+  useEffect(() => {
+    if (!spotlightPoint || !mapInstanceRef.current || !mapReady) return;
+    const lat = Number(spotlightPoint.latitude);
+    const lng = Number(spotlightPoint.longitude);
+    if (!isNaN(lat) && !isNaN(lng)) {
+      mapInstanceRef.current.flyTo([lat, lng], 13.5, {
+        duration: 1.5,
+        easeLinearity: 0.25,
+      });
+    }
+  }, [spotlightPoint, mapReady]);
 
   // Update Markers
   useEffect(() => {

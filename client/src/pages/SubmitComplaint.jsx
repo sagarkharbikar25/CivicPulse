@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { Card, CardHeader, Button, Badge } from '../components/ui';
-import { SendIcon, RoadIcon, WaterIcon, ElectricityIcon, SanitationIcon, AlertIcon, CheckIcon, MapPinIcon } from '../components/icons';
+import { SendIcon, RoadIcon, WaterIcon, ElectricityIcon, SanitationIcon, AlertIcon, CheckIcon, MapPinIcon, MicIcon } from '../components/icons';
 import { submitTextComplaint } from '../lib/api';
+import { VoiceRecorder } from '../components/voice';
 
 export default function SubmitComplaint({ regions = [], onComplaintSubmitted, onNavigateDashboard }) {
-  const [regionName, setRegionName] = useState(regions[0]?.region_name || 'East Ward - Sector 4');
+  const [inputMode, setInputMode] = useState('voice'); // 'voice' | 'text'
+  const [regionName, setRegionName] = useState(regions[0]?.region_name || 'Ward 12 - Dharavi / Shahu Nagar');
   const [category, setCategory] = useState('water');
   const [severity, setSeverity] = useState(7);
   const [text, setText] = useState('');
@@ -97,15 +99,58 @@ export default function SubmitComplaint({ regions = [], onComplaintSubmitted, on
         </p>
       </div>
 
-      {/* Demo Quick-Presets */}
-      <div className="rounded-2xl bg-[#09090C] border border-white/10 p-5 shadow-2xl relative overflow-hidden">
-        <div className="light-slit absolute top-0 inset-x-0" />
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider font-mono">
-            Demo Presets (Instant Multilingual Test Cases)
-          </span>
-          <span className="text-[11px] text-slate-500 font-mono">Click to autofill</span>
+      {/* Mode Switcher Tabs */}
+      <div className="flex items-center justify-center">
+        <div className="p-1 rounded-full bg-white/5 border border-white/10 flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setInputMode('voice')}
+            className={`flex items-center gap-2 px-5 py-2 rounded-full text-xs font-medium transition-all ${
+              inputMode === 'voice'
+                ? 'bg-white text-black shadow-lg font-semibold'
+                : 'text-zinc-400 hover:text-white'
+            }`}
+          >
+            <MicIcon className="w-3.5 h-3.5" />
+            <span>Voice Grievance (WOW Feature)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setInputMode('text')}
+            className={`flex items-center gap-2 px-5 py-2 rounded-full text-xs font-medium transition-all ${
+              inputMode === 'text'
+                ? 'bg-white text-black shadow-lg font-semibold'
+                : 'text-zinc-400 hover:text-white'
+            }`}
+          >
+            <SendIcon className="w-3.5 h-3.5" />
+            <span>Text Ingestion Form</span>
+          </button>
         </div>
+      </div>
+
+      {/* Voice Mode */}
+      {inputMode === 'voice' && (
+        <VoiceRecorder
+          onSubmissionComplete={(newSub, fullResult) => {
+            if (onComplaintSubmitted) onComplaintSubmitted(newSub, fullResult);
+          }}
+          onViewOnMap={onNavigateDashboard}
+        />
+      )}
+
+      {/* Text Mode */}
+      {inputMode === 'text' && (
+        <>
+          {/* Demo Quick-Presets */}
+          <div className="rounded-2xl bg-[#09090C] border border-white/10 p-5 shadow-2xl relative overflow-hidden">
+            <div className="light-slit absolute top-0 inset-x-0" />
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider font-mono">
+                Demo Presets (Instant Multilingual Test Cases)
+              </span>
+              <span className="text-[11px] text-slate-500 font-mono">Click to autofill</span>
+            </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {presets.map((preset, idx) => (
             <button
@@ -318,6 +363,8 @@ export default function SubmitComplaint({ regions = [], onComplaintSubmitted, on
           </form>
         )}
       </div>
+        </>
+      )}
     </div>
   );
 }

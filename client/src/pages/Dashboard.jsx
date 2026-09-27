@@ -10,6 +10,7 @@ export default function Dashboard({
   priorities = [],
   onNavigateSubmit,
   onNavigatePolicymakers,
+  spotlightPoint = null,
 }) {
   const [selectedPointId, setSelectedPointId] = useState(heatmapData[0]?.id || '1');
   const [activeLayer, setActiveLayer] = useState('urgency');
@@ -120,6 +121,7 @@ export default function Dashboard({
             onSelectPoint={(point) => setSelectedPointId(point.id)}
             activeLayer={activeLayer}
             onLayerChange={setActiveLayer}
+            spotlightPoint={spotlightPoint}
           />
 
           {/* Regional Details Card */}
