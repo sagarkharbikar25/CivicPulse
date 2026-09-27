@@ -177,6 +177,7 @@ civicpulse/
 ├── seed/
 │   └── region_index_seed.sql      # mocked demographic/infra data
 ├── plan.md                        # this file
+├── SECURITY.md                    # security architecture & DPI safeguards
 └── README.md
 ```
 
@@ -243,3 +244,25 @@ Commit frequently within each branch (aim for 5–8 commits/day minimum) — sol
 4. **Close on scalability** (10 sec): mention the Digital Public Good framing — multilingual, region-agnostic schema, exactly what the BRICS brief asks for.
 
 Keep total demo under 90 seconds. Judges reward clarity and a working live moment over feature-count.
+
+---
+
+## 12. Security Architecture & Digital Public Infrastructure (DPI) Safeguards
+
+CivicPulse handles public citizen submissions and municipal policymaker prioritization. As a Digital Public Good, security, privacy, and integrity are foundational design pillars:
+
+1. **Edge & Transport Defense:**
+   - Strict HTTP security headers (`Helmet`, HSTS, X-Content-Type-Options, X-Frame-Options, CSP).
+   - Strict CORS origin whitelisting matching deployed frontend clients.
+2. **Abuse & DoS Mitigation:**
+   - Multi-tier rate limiting via `express-rate-limit` (General API limiter: 100 req / 15 min; Citizen Intake limiter: 15 req / 15 min per IP to prevent spam bot flooding).
+   - Request body size limits (100kb payload caps) to prevent memory exhaustion and large payload exploits.
+3. **Citizen Privacy & PII Masking:**
+   - Automatic anonymization of citizen identifiers; exact addresses generalized to ward/sector levels before public heatmap broadcast.
+4. **Data Layer Integrity & Row Level Security (RLS):**
+   - PostgreSQL Row Level Security enabled on all core tables (`submissions`, `region_index`, `priority_projects`).
+   - Read-only public policies, restricted write policies, and service-role / authenticated access for administrative recalculation.
+5. **Administrative Access Control:**
+   - Protected `/api/admin/*` endpoints requiring secure key/token validation to prevent unauthorized re-scoring manipulation.
+6. **Detailed Specification:**
+   - See [SECURITY.md](file:///d:/GitHub/CivicPulse/SECURITY.md) for the complete vulnerability policy, threat model, RLS SQL policies, and implementation guidelines.
