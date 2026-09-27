@@ -1,0 +1,33 @@
+{
+  "name": "civicpulse-server",
+  "version": "1.0.0",
+  "description": "CivicPulse Core Backend Express API - AI-Powered Citizen Infrastructure Prioritization Platform",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node test/scoringEngine.test.js",
+    "test:api": "node test/api.test.js",
+    "test:ai": "node test/aiPipeline.test.js",
+    "test:all": "node test/scoringEngine.test.js && node test/api.test.js && node test/aiPipeline.test.js"
+  },
+  "keywords": [
+    "civic-tech",
+    "infrastructure",
+    "ai",
+    "express",
+    "supabase"
+  ],
+  "author": "CivicPulse Team",
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^8.7.0",
+    "helmet": "^8.3.0",
+    "multer": "^2.4.0"
+  }
+}
