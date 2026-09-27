@@ -32,16 +32,23 @@ export default function LeafletMapView({
 
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    // Free, high-contrast dark tiles without any API key requirement
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
-      maxZoom: 16,
-      attribution: 'Esri, DeLorme, NAVTEQ',
+    // Reliable, global OpenStreetMap tiles styled dark via CSS filter (zero API keys, zero watermarks)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      subdomains: ['a', 'b', 'c'],
+      attribution: '&copy; OpenStreetMap contributors',
     }).addTo(map);
 
     mapInstanceRef.current = map;
     setMapReady(true);
 
+    // Force Leaflet to re-calculate dimensions properly
+    const resizeTimer = setTimeout(() => {
+      map.invalidateSize();
+    }, 250);
+
     return () => {
+      clearTimeout(resizeTimer);
       map.remove();
       mapInstanceRef.current = null;
     };
@@ -145,7 +152,7 @@ export default function LeafletMapView({
   };
 
   return (
-    <div className={`relative w-full rounded-2xl bg-[#000000] border border-white/[0.12] overflow-hidden shadow-card-glass ${className}`}>
+    <div className={`relative w-full rounded-2xl bg-[#08080C] border border-white/[0.12] overflow-hidden shadow-card-glass ${className}`}>
       {/* Animated smooth moving white light beam along top edge */}
       <div className="animated-border-beam" />
 
@@ -218,7 +225,7 @@ export default function LeafletMapView({
         </div>
 
         <div className="text-[11px] text-slate-500 font-mono hidden sm:block">
-          Esri Dark Gray Base • OpenStreetMap Data
+          OpenStreetMap Dark Cartography
         </div>
       </div>
     </div>

@@ -148,9 +148,9 @@
   border-radius: 1rem;
 }
 
-/* Seamlessly blend map tiles with luxury dark background */
+/* Seamlessly invert map tiles into high-contrast luxury dark cartography */
 .leaflet-tile {
-  filter: brightness(0.7) contrast(1.35) grayscale(0.5) !important;
+  filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(110%) grayscale(60%) !important;
 }
 
 /* Leaflet zoom controls styling */
