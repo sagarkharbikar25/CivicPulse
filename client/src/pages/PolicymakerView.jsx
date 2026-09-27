@@ -14,10 +14,11 @@ export default function PolicymakerView({ priorities = [], onRecompute, isRecomp
     { id: 'sanitation', label: 'Sanitation' },
   ];
 
-  let displayedPriorities = [...priorities];
+  const safePriorities = Array.isArray(priorities) ? priorities : [];
+  let displayedPriorities = [...safePriorities];
   if (selectedCategory !== 'all') {
     displayedPriorities = displayedPriorities.filter(
-      p => p.category.toLowerCase() === selectedCategory.toLowerCase()
+      p => p.category?.toLowerCase() === selectedCategory.toLowerCase()
     );
   }
 

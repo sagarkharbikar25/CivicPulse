@@ -6,6 +6,25 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 let localSubmissions = [...MOCK_SUBMISSIONS];
 let localPriorities = [...MOCK_PRIORITIES];
 
+function getFallbackHeatmap() {
+  return MOCK_REGIONS.map(r => {
+    const related = localSubmissions.filter(s => s.region_name === r.region_name);
+    const intensity = related.length > 0
+      ? related.reduce((acc, curr) => acc + curr.urgency_score, 0) / related.length
+      : r.infra_gap_score;
+    return {
+      id: r.id,
+      name: r.region_name,
+      latitude: r.latitude,
+      longitude: r.longitude,
+      intensity: Math.min(100, Math.round(intensity)),
+      submissionsCount: related.length || 3,
+      population: r.population,
+      gapScore: r.infra_gap_score,
+    };
+  });
+}
+
 export async function fetchSubmissions(filters = {}) {
   try {
     const params = new URLSearchParams();
@@ -13,9 +32,11 @@ export async function fetchSubmissions(filters = {}) {
     if (filters.region) params.append('region', filters.region);
     if (filters.status) params.append('status', filters.status);
 
-    const res = await fetch(`${BASE_URL}/api/submissions?${params.toString()}`, { signal: AbortSignal.timeout(2000) });
+    const res = await fetch(`${BASE_URL}/api/submissions?${params.toString()}`, { signal: AbortSignal.timeout(2500) });
     if (!res.ok) throw new Error('API failed');
-    return await res.json();
+    const json = await res.json();
+    const items = Array.isArray(json) ? json : (json.data || []);
+    return Array.isArray(items) && items.length > 0 ? items : localSubmissions;
   } catch {
     // Fallback to local data
     let filtered = [...localSubmissions];
@@ -31,9 +52,11 @@ export async function fetchSubmissions(filters = {}) {
 
 export async function fetchPriorities() {
   try {
-    const res = await fetch(`${BASE_URL}/api/priority`, { signal: AbortSignal.timeout(2000) });
+    const res = await fetch(`${BASE_URL}/api/priority`, { signal: AbortSignal.timeout(2500) });
     if (!res.ok) throw new Error('API failed');
-    return await res.json();
+    const json = await res.json();
+    const items = Array.isArray(json) ? json : (json.data || []);
+    return Array.isArray(items) && items.length > 0 ? items : localPriorities;
   } catch {
     return localPriorities;
   }
@@ -41,35 +64,44 @@ export async function fetchPriorities() {
 
 export async function fetchHeatmapData() {
   try {
-    const res = await fetch(`${BASE_URL}/api/priority/heatmap`, { signal: AbortSignal.timeout(2000) });
+    const res = await fetch(`${BASE_URL}/api/priority/heatmap`, { signal: AbortSignal.timeout(2500) });
     if (!res.ok) throw new Error('API failed');
-    return await res.json();
+    const json = await res.json();
+
+    // If backend returns GeoJSON FeatureCollection
+    if (json && Array.isArray(json.features) && json.features.length > 0) {
+      return json.features.map((f, idx) => {
+        const coords = f.geometry?.coordinates || [72.85, 19.04];
+        const props = f.properties || {};
+        return {
+          id: props.id || `point-${idx}`,
+          name: props.region_name || 'Municipal Ward',
+          latitude: Number(coords[1]),
+          longitude: Number(coords[0]),
+          intensity: Math.round(Number(props.urgency_score) || 75),
+          submissionsCount: 3,
+          population: 450000,
+          gapScore: Math.round(Number(props.urgency_score) || 70),
+        };
+      });
+    }
+
+    if (Array.isArray(json)) return json;
+    if (Array.isArray(json.data)) return json.data;
+
+    return getFallbackHeatmap();
   } catch {
-    // Return geo-points derived from regions & submissions
-    return MOCK_REGIONS.map(r => {
-      const related = localSubmissions.filter(s => s.region_name === r.region_name);
-      const intensity = related.length > 0
-        ? related.reduce((acc, curr) => acc + curr.urgency_score, 0) / related.length
-        : r.infra_gap_score;
-      return {
-        id: r.id,
-        name: r.region_name,
-        latitude: r.latitude,
-        longitude: r.longitude,
-        intensity: Math.min(100, Math.round(intensity)),
-        submissionsCount: related.length || 3,
-        population: r.population,
-        gapScore: r.infra_gap_score,
-      };
-    });
+    return getFallbackHeatmap();
   }
 }
 
 export async function fetchRegions() {
   try {
-    const res = await fetch(`${BASE_URL}/api/regions`, { signal: AbortSignal.timeout(2000) });
+    const res = await fetch(`${BASE_URL}/api/regions`, { signal: AbortSignal.timeout(2500) });
     if (!res.ok) throw new Error('API failed');
-    return await res.json();
+    const json = await res.json();
+    const items = Array.isArray(json) ? json : (json.data || []);
+    return Array.isArray(items) && items.length > 0 ? items : MOCK_REGIONS;
   } catch {
     return MOCK_REGIONS;
   }
@@ -81,10 +113,16 @@ export async function submitTextComplaint(data) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
-      signal: AbortSignal.timeout(3000),
+      signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) throw new Error('API failed');
-    return await res.json();
+    const json = await res.json();
+    const sub = json.data || json.submission;
+    if (sub) {
+      localSubmissions.unshift(sub);
+      return { success: true, submission: sub };
+    }
+    return json;
   } catch {
     // Generate intelligent simulation in fallback mode
     const region = MOCK_REGIONS.find(r => r.region_name === data.region_name) || MOCK_REGIONS[0];
@@ -95,9 +133,9 @@ export async function submitTextComplaint(data) {
     const newSub = {
       id: `sub-${Date.now()}`,
       raw_input_type: 'text',
-      raw_text: data.text,
+      raw_text: data.text || data.raw_text,
       language_detected: 'English',
-      translated_text: data.text,
+      translated_text: data.text || data.raw_text,
       category: category,
       latitude: region.latitude + (Math.random() - 0.5) * 0.01,
       longitude: region.longitude + (Math.random() - 0.5) * 0.01,
@@ -116,7 +154,8 @@ export async function recomputePriorities() {
   try {
     const res = await fetch(`${BASE_URL}/api/admin/recompute`, {
       method: 'POST',
-      signal: AbortSignal.timeout(3000),
+      headers: { 'x-admin-key': 'civicpulse-admin-dev-key' },
+      signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) throw new Error('API failed');
     return await res.json();

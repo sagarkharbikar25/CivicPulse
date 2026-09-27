@@ -12,13 +12,17 @@ export default function Dashboard({
   onNavigatePolicymakers,
   spotlightPoint = null,
 }) {
-  const [selectedPointId, setSelectedPointId] = useState(heatmapData[0]?.id || '1');
+  const safeHeatmapData = Array.isArray(heatmapData) ? heatmapData : [];
+  const safeSubmissions = Array.isArray(submissions) ? submissions : [];
+  const safePriorities = Array.isArray(priorities) ? priorities : [];
+
+  const [selectedPointId, setSelectedPointId] = useState(safeHeatmapData[0]?.id || '1');
   const [activeLayer, setActiveLayer] = useState('urgency');
   const [categoryFilter, setCategoryFilter] = useState('all');
 
-  const selectedNode = heatmapData.find(p => p.id === selectedPointId) || heatmapData[0];
+  const selectedNode = safeHeatmapData.find(p => p.id === selectedPointId) || safeHeatmapData[0];
 
-  const filteredSubmissions = submissions.filter(sub => {
+  const filteredSubmissions = safeSubmissions.filter(sub => {
     if (categoryFilter !== 'all' && sub.category !== categoryFilter) return false;
     return true;
   });
@@ -84,14 +88,14 @@ export default function Dashboard({
         <StatPill
           icon={PulseIcon}
           label="Total Grievances"
-          value={submissions.length + 138}
+          value={safeSubmissions.length + 138}
           subvalue="across 7 sectors"
           trend="+18% vs avg"
         />
         <StatPill
           icon={AlertIcon}
           label="Critical Clusters"
-          value={priorities.filter(p => p.avg_urgency >= 85).length || 2}
+          value={safePriorities.filter(p => p.avg_urgency >= 85).length || 2}
           subvalue="action required"
           trend="Severe"
         />
@@ -116,7 +120,7 @@ export default function Dashboard({
         {/* Left Column: Leaflet Map (7 cols) */}
         <div className="lg:col-span-7 space-y-4">
           <LeafletMapView
-            points={heatmapData}
+            points={safeHeatmapData}
             selectedPointId={selectedPointId}
             onSelectPoint={(point) => setSelectedPointId(point.id)}
             activeLayer={activeLayer}
