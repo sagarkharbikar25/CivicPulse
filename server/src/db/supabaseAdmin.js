@@ -11,7 +11,7 @@ import { localStore } from './localStore.js';
 dotenv.config();
 
 const supabaseUrl = process.env.SUPABASE_URL?.trim();
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+const supabaseServiceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY)?.trim();
 
 export const isSupabaseConfigured = Boolean(
   supabaseUrl && 
