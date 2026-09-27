@@ -74,8 +74,9 @@ Do not include any greeting or explanation. Exactly one sentence.`;
  * Lightweight LLM call wrapper
  */
 async function callLightweightLlm(prompt) {
-  if (LLM_API_KEY.startsWith('AIza') || process.env.LLM_PROVIDER === 'gemini') {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${LLM_API_KEY}`;
+  if (LLM_API_KEY.startsWith('AIza') || LLM_API_KEY.startsWith('AQ') || process.env.LLM_PROVIDER === 'gemini') {
+    const model = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${LLM_API_KEY}`;
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
