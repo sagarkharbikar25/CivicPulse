@@ -14,16 +14,17 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Security Headers & Rate Limiting
-app.use(helmetMiddleware);
-app.use(generalRateLimiter);
-
-// CORS configuration
+// CORS configuration (MUST be first so errors and rate limits include CORS headers)
 app.use(cors({
-  origin: process.env.CLIENT_ORIGIN || '*',
+  origin: true,
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-key'],
 }));
+
+// Security Headers & Rate Limiting
+app.use(helmetMiddleware);
+app.use(generalRateLimiter);
 
 // Payload size limit to prevent memory exhaustion DoS
 app.use(express.json({ limit: '100kb' }));

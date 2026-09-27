@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Card, CardHeader, Button, Badge } from '../components/ui';
-import { SendIcon, RoadIcon, WaterIcon, ElectricityIcon, SanitationIcon, AlertIcon, CheckIcon, MapPinIcon, MicIcon } from '../components/icons';
+import { SendIcon, RoadIcon, WaterIcon, ElectricityIcon, SanitationIcon, AlertIcon, CheckIcon, MapPinIcon, MicIcon, RefreshIcon } from '../components/icons';
 import { submitTextComplaint } from '../lib/api';
 import { VoiceRecorder } from '../components/voice';
 
@@ -12,6 +12,9 @@ export default function SubmitComplaint({ regions = [], onComplaintSubmitted, on
   const [text, setText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedResult, setSubmittedResult] = useState(null);
+  const [isLocating, setIsLocating] = useState(false);
+  const [geoStatus, setGeoStatus] = useState(null);
+  const [realCoords, setRealCoords] = useState(null);
 
   const categories = [
     { id: 'water', label: 'Water & Sewage', icon: WaterIcon },
@@ -56,22 +59,88 @@ export default function SubmitComplaint({ regions = [], onComplaintSubmitted, on
     setSubmittedResult(null);
   };
 
+  const handleDetectLocation = () => {
+    if (!navigator.geolocation) {
+      setGeoStatus({
+        type: 'error',
+        text: 'Geolocation is not supported by your browser.',
+      });
+      return;
+    }
+
+    setIsLocating(true);
+    setGeoStatus({ type: 'locating', text: 'Acquiring high-precision GPS coordinates from your device...' });
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude, accuracy } = position.coords;
+        setRealCoords({ latitude, longitude, accuracy });
+
+        const safeRegions = Array.isArray(regions) && regions.length > 0 ? regions : [];
+        let nearest = safeRegions[0];
+        let minDistance = Infinity;
+
+        safeRegions.forEach((reg) => {
+          if (reg.latitude && reg.longitude) {
+            const dLat = Number(reg.latitude) - latitude;
+            const dLng = Number(reg.longitude) - longitude;
+            const dist = Math.sqrt(dLat * dLat + dLng * dLng);
+            if (dist < minDistance) {
+              minDistance = dist;
+              nearest = reg;
+            }
+          }
+        });
+
+        if (nearest) {
+          setRegionName(nearest.region_name);
+          setGeoStatus({
+            type: 'success',
+            text: `GPS locked: ${nearest.region_name} (${latitude.toFixed(4)}, ${longitude.toFixed(4)} • ±${Math.round(accuracy)}m)`,
+            coords: { latitude, longitude },
+          });
+        } else {
+          setGeoStatus({
+            type: 'success',
+            text: `GPS locked: ${latitude.toFixed(4)}, ${longitude.toFixed(4)} • ±${Math.round(accuracy)}m`,
+            coords: { latitude, longitude },
+          });
+        }
+        setIsLocating(false);
+      },
+      (err) => {
+        console.warn('[Geolocation error]', err);
+        setIsLocating(false);
+        let msg = 'Unable to acquire GPS signal. Please select your ward manually.';
+        if (err.code === 1) msg = 'Location access denied. Please allow location permissions in your browser.';
+        else if (err.code === 2) msg = 'Location position unavailable. Please choose your ward manually.';
+        else if (err.code === 3) msg = 'GPS request timed out. Please try again.';
+        setGeoStatus({ type: 'error', text: msg });
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+    );
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!text.trim()) return;
 
     setIsSubmitting(true);
     try {
+      const selectedReg = regions.find(r => r.region_name === regionName) || regions[0] || {};
       const res = await submitTextComplaint({
         region_name: regionName,
         category,
         severity,
         text,
+        latitude: realCoords?.latitude || selectedReg.latitude || 19.0402,
+        longitude: realCoords?.longitude || selectedReg.longitude || 72.8508,
       });
 
-      if (res && res.submission) {
-        setSubmittedResult(res.submission);
-        if (onComplaintSubmitted) onComplaintSubmitted(res.submission);
+      if (res && (res.submission || res.data)) {
+        const sub = res.submission || res.data;
+        setSubmittedResult(sub);
+        if (onComplaintSubmitted) onComplaintSubmitted(sub);
       }
     } catch (err) {
       console.error('Submission failed', err);
@@ -236,16 +305,33 @@ export default function SubmitComplaint({ regions = [], onComplaintSubmitted, on
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Step 1: Select Ward */}
+            {/* Step 1: Select Ward with Real-Time Location Button */}
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider font-mono mb-2">
-                1. Affected Municipal Ward
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider font-mono">
+                  1. Affected Municipal Ward
+                </label>
+                <button
+                  type="button"
+                  onClick={handleDetectLocation}
+                  disabled={isLocating}
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs font-mono transition-all border border-white/15 hover:border-white/30 cursor-pointer shadow-sm disabled:opacity-50"
+                  title="Detect My Real-Time Location (GPS)"
+                >
+                  {isLocating ? (
+                    <RefreshIcon className="w-3.5 h-3.5 animate-spin text-cyan-400" />
+                  ) : (
+                    <MapPinIcon className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
+                  )}
+                  <span>{isLocating ? 'Detecting GPS...' : 'Use Real-Time GPS'}</span>
+                </button>
+              </div>
+
               <div className="relative">
                 <select
                   value={regionName}
                   onChange={(e) => setRegionName(e.target.value)}
-                  className="w-full bg-[#121217] border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-100 focus:outline-none focus:border-white/30 transition-colors cursor-pointer appearance-none"
+                  className="w-full bg-[#121217] border border-white/10 rounded-xl px-4 py-3 pr-12 text-sm text-slate-100 focus:outline-none focus:border-white/30 transition-colors cursor-pointer appearance-none"
                 >
                   {regions.map((reg) => (
                     <option key={reg.id} value={reg.region_name} className="bg-[#121217] text-slate-100">
@@ -253,10 +339,46 @@ export default function SubmitComplaint({ regions = [], onComplaintSubmitted, on
                     </option>
                   ))}
                 </select>
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                  <MapPinIcon className="w-4 h-4 text-white/70" />
-                </div>
+
+                {/* Clickable Pin Button inside the dropdown */}
+                <button
+                  type="button"
+                  onClick={handleDetectLocation}
+                  disabled={isLocating}
+                  title="Detect My Real-Time Location (GPS)"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                >
+                  {isLocating ? (
+                    <RefreshIcon className="w-4 h-4 animate-spin text-cyan-400" />
+                  ) : (
+                    <MapPinIcon className="w-4 h-4 text-cyan-400" />
+                  )}
+                </button>
               </div>
+
+              {/* Real-Time Geolocation Status Feedback Pill */}
+              {geoStatus && (
+                <div
+                  className={`mt-2.5 flex items-center gap-2 text-xs font-mono px-3.5 py-2 rounded-xl border transition-all ${
+                    geoStatus.type === 'success'
+                      ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
+                      : geoStatus.type === 'error'
+                      ? 'bg-rose-950/40 border-rose-500/40 text-rose-300'
+                      : 'bg-white/5 border-white/15 text-slate-300'
+                  }`}
+                >
+                  <span
+                    className={`w-2 h-2 rounded-full shrink-0 ${
+                      geoStatus.type === 'success'
+                        ? 'bg-emerald-400 shadow-glow-emerald animate-pulse'
+                        : geoStatus.type === 'error'
+                        ? 'bg-rose-400'
+                        : 'bg-cyan-400 animate-ping'
+                    }`}
+                  />
+                  <span className="leading-snug">{geoStatus.text}</span>
+                </div>
+              )}
             </div>
 
             {/* Step 2: Category Selector */}

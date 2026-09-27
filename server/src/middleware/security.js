@@ -38,10 +38,10 @@ export const helmetMiddleware = helmet({
 /**
  * 2. Multi-Tier Rate Limiters
  */
-// General API rate limiter (100 req per 15 minutes)
+// General API rate limiter (generous in dev/demo mode)
 export const generalRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: process.env.NODE_ENV === 'test' ? 1000 : 100,
+  max: process.env.NODE_ENV === 'production' ? 100 : 5000,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -50,10 +50,10 @@ export const generalRateLimiter = rateLimit({
   },
 });
 
-// Strict citizen intake rate limiter (20 submissions per 15 minutes per IP)
+// Citizen intake rate limiter (generous in dev/demo mode)
 export const submissionRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: process.env.NODE_ENV === 'test' ? 1000 : 20,
+  max: process.env.NODE_ENV === 'production' ? 20 : 1000,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
