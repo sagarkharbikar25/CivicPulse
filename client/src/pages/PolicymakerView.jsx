@@ -60,7 +60,7 @@ export default function PolicymakerView({ priorities = [], onRecompute, isRecomp
 
       {/* Transparent Formula Callout */}
       <div className="rounded-2xl bg-[#09090C] border border-white/10 p-5 shadow-2xl relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="light-slit absolute top-0 inset-x-0" />
+        <div className="animated-border-beam" />
         <div className="flex items-center gap-3.5">
           <div className="w-10 h-10 rounded-full bg-white/10 border border-white/20 text-white flex items-center justify-center shrink-0">
             <PulseIcon className="w-5 h-5 text-white" />

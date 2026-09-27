@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import LeafletMapView from '../components/map/LeafletMapView';
+import CpuHeroTraces from '../components/layout/CpuHeroTraces';
 import { Card, CardHeader, Badge, Button, StatPill } from '../components/ui';
 import { PulseIcon, AlertIcon, RoadIcon, WaterIcon, MicIcon, SendIcon, ChevronIcon } from '../components/icons';
 
@@ -31,43 +32,10 @@ export default function Dashboard({
 
   return (
     <div className="space-y-12 pb-16">
-      {/* HERO SECTION MATCHING REFERENCE IMAGE */}
-      <section className="relative pt-6 pb-12 overflow-hidden flex flex-col items-center justify-center text-center">
-        {/* Floating Telemetry Badge Left (Top) */}
-        <div className="hidden lg:flex items-center gap-3 absolute left-4 top-12 select-none pointer-events-none">
-          <div className="light-slit w-20" />
-          <div className="glass-pill px-3.5 py-1.5 rounded-full text-left border border-white/10 shadow-2xl">
-            <span className="text-[10px] text-slate-400 block font-mono">• Old City Grid</span>
-            <span className="text-xs font-bold text-white font-mono">95.1 Urgency</span>
-          </div>
-        </div>
-
-        {/* Floating Telemetry Badge Left (Bottom) */}
-        <div className="hidden lg:flex items-center gap-3 absolute left-12 bottom-6 select-none pointer-events-none">
-          <div className="light-slit w-16" />
-          <div className="glass-pill px-3.5 py-1.5 rounded-full text-left border border-white/10 shadow-2xl">
-            <span className="text-[10px] text-slate-400 block font-mono">• East Ward Feeder</span>
-            <span className="text-xs font-bold text-white font-mono">92.4 Urgency</span>
-          </div>
-        </div>
-
-        {/* Floating Telemetry Badge Right (Top) */}
-        <div className="hidden lg:flex items-center gap-3 absolute right-4 top-16 select-none pointer-events-none">
-          <div className="glass-pill px-3.5 py-1.5 rounded-full text-right border border-white/10 shadow-2xl">
-            <span className="text-[10px] text-slate-400 block font-mono">Industrial Highway •</span>
-            <span className="text-xs font-bold text-white font-mono">88.7 Urgency</span>
-          </div>
-          <div className="light-slit w-20" />
-        </div>
-
-        {/* Floating Telemetry Badge Right (Bottom) */}
-        <div className="hidden lg:flex items-center gap-3 absolute right-10 bottom-8 select-none pointer-events-none">
-          <div className="glass-pill px-3.5 py-1.5 rounded-full text-right border border-white/10 shadow-2xl">
-            <span className="text-[10px] text-slate-400 block font-mono">Metro Feeder •</span>
-            <span className="text-xs font-bold text-white font-mono">61.5 Urgency</span>
-          </div>
-          <div className="light-slit w-16" />
-        </div>
+      {/* HERO SECTION MATCHING REFERENCE IMAGE WITH CPU-STYLE CENTER-ORIGIN TRACES */}
+      <section className="relative pt-12 pb-16 overflow-hidden flex flex-col items-center justify-center text-center">
+        {/* Dynamic CPU Circuit Motherboard Traces Starting from Center */}
+        <CpuHeroTraces />
 
         {/* Top Mini Pill Announcement */}
         <button
@@ -157,7 +125,7 @@ export default function Dashboard({
           {/* Regional Details Card */}
           {selectedNode && (
             <div className="rounded-2xl bg-[#09090C] border border-white/10 p-5 shadow-2xl relative overflow-hidden">
-              <div className="light-slit-accent absolute top-0 inset-x-0" />
+              <div className="animated-border-beam" />
               <div className="flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-2">
@@ -218,7 +186,8 @@ export default function Dashboard({
 
         {/* Right Column: Live Ingestion Feed (5 cols) */}
         <div className="lg:col-span-5 space-y-4">
-          <div className="rounded-2xl bg-[#09090C] border border-white/10 p-5 shadow-2xl space-y-4">
+          <div className="rounded-2xl bg-[#09090C] border border-white/10 p-5 shadow-2xl space-y-4 relative overflow-hidden">
+            <div className="animated-border-beam" />
             <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
               <div>
                 <h3 className="text-sm font-semibold text-white tracking-tight">Live Ingested Transcripts</h3>

@@ -32,9 +32,10 @@ export default function LeafletMapView({
 
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19,
-      subdomains: 'abcd',
+    // Free, high-contrast dark tiles without any API key requirement
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 16,
+      attribution: 'Esri, DeLorme, NAVTEQ',
     }).addTo(map);
 
     mapInstanceRef.current = map;
@@ -145,6 +146,9 @@ export default function LeafletMapView({
 
   return (
     <div className={`relative w-full rounded-2xl bg-[#000000] border border-white/[0.12] overflow-hidden shadow-card-glass ${className}`}>
+      {/* Animated smooth moving white light beam along top edge */}
+      <div className="animated-border-beam" />
+
       {/* Top Map Floating Toolbar */}
       <div className="absolute top-4 left-4 right-4 z-[400] flex items-center justify-between pointer-events-none">
         {/* Status Pill */}
@@ -214,7 +218,7 @@ export default function LeafletMapView({
         </div>
 
         <div className="text-[11px] text-slate-500 font-mono hidden sm:block">
-          CartoDB Dark Matter Tiles • OpenStreetMap Data
+          Esri Dark Gray Base • OpenStreetMap Data
         </div>
       </div>
     </div>

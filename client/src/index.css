@@ -15,22 +15,103 @@
   }
 }
 
-/* Glowing horizontal light slits from reference image */
+/* Static glowing horizontal light slits from reference image */
 .light-slit {
   position: relative;
   height: 1px;
   background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 30%, #ffffff 50%, rgba(255,255,255,0.4) 70%, transparent 100%);
-  box-shadow: 0 0 16px 1px rgba(255, 255, 255, 0.6);
+  box-shadow: 0 0 12px 2px rgba(255, 255, 255, 0.7), 0 0 24px 4px rgba(255, 255, 255, 0.25);
 }
 
-.light-slit-accent {
-  position: relative;
+/* Animated Smooth Moving Light Beam on Frames (Fixes blue line, adds pure white moving animation) */
+.animated-border-beam {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  overflow: hidden;
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+  pointer-events: none;
+  z-index: 20;
+}
+
+/* Underlying subtle hairline */
+.animated-border-beam::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.15) 15%, rgba(255, 255, 255, 0.15) 85%, transparent 100%);
+}
+
+/* Moving pure white gleaming beam with smooth alternate animation */
+.animated-border-beam::after {
+  content: '';
+  position: absolute;
+  top: 0;
   height: 2px;
-  background: linear-gradient(90deg, transparent 0%, rgba(0, 210, 255, 0.6) 30%, #ffffff 50%, rgba(0, 210, 255, 0.6) 70%, transparent 100%);
-  box-shadow: 0 0 18px 2px rgba(0, 210, 255, 0.5), 0 0 8px rgba(255, 255, 255, 0.8);
+  width: 180px;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.35) 25%, #ffffff 50%, rgba(255, 255, 255, 0.35) 75%, transparent 100%);
+  box-shadow: 
+    0 0 14px 2px rgba(255, 255, 255, 0.95),
+    0 0 28px 6px rgba(255, 255, 255, 0.45),
+    0 0 45px 10px rgba(255, 255, 255, 0.2);
+  animation: border-beam-sweep 3.5s ease-in-out infinite alternate;
 }
 
-/* Subtle ambient spotlight glows matching reference corners */
+@keyframes border-beam-sweep {
+  0% {
+    left: 0%;
+    transform: translateX(-30%);
+  }
+  100% {
+    left: 100%;
+    transform: translateX(-70%);
+  }
+}
+
+/* CPU Circuit Traces: Pulses traveling from center outward */
+@keyframes cpu-pulse-travel {
+  0% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: -820;
+    opacity: 0;
+  }
+}
+
+.cpu-trace-pulse-1 {
+  animation: cpu-pulse-travel 3.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.cpu-trace-pulse-2 {
+  animation: cpu-pulse-travel 3.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  animation-delay: 0.8s;
+}
+
+.cpu-trace-pulse-3 {
+  animation: cpu-pulse-travel 3.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  animation-delay: 0.4s;
+}
+
+.cpu-trace-pulse-4 {
+  animation: cpu-pulse-travel 3.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  animation-delay: 1.2s;
+}
+
+/* Ambient spotlight glows matching reference corners */
 .ambient-spotlights {
   position: fixed;
   inset: 0;
@@ -62,14 +143,14 @@
 
 /* Leaflet dark theme customizations */
 .leaflet-container {
-  background-color: #050508 !important;
+  background-color: #000000 !important;
   font-family: inherit;
   border-radius: 1rem;
 }
 
-/* Seamlessly blend CartoDB dark tiles */
+/* Seamlessly blend map tiles with luxury dark background */
 .leaflet-tile {
-  filter: brightness(0.9) contrast(1.15) !important;
+  filter: brightness(0.7) contrast(1.35) grayscale(0.5) !important;
 }
 
 /* Leaflet zoom controls styling */
@@ -93,7 +174,7 @@
 
 .leaflet-bar a:hover {
   background-color: rgba(30, 30, 38, 0.95) !important;
-  color: #00D2FF !important;
+  color: #ffffff !important;
 }
 
 /* Dark glass Leaflet popup */
@@ -102,7 +183,7 @@
   backdrop-filter: blur(20px) !important;
   border: 1px solid rgba(255, 255, 255, 0.15) !important;
   border-radius: 1rem !important;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8), 0 0 25px rgba(0, 210, 255, 0.15) !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8), 0 0 25px rgba(255, 255, 255, 0.1) !important;
   color: #EDEDED !important;
   padding: 0 !important;
 }

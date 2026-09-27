@@ -133,7 +133,7 @@ export default function SubmitComplaint({ regions = [], onComplaintSubmitted, on
 
       {/* Main Submission Form */}
       <div className="rounded-2xl bg-[#09090C] border border-white/10 p-6 sm:p-8 shadow-2xl relative overflow-hidden">
-        <div className="light-slit-accent absolute top-0 inset-x-0" />
+        <div className="animated-border-beam" />
 
         {submittedResult ? (
           <div className="text-center py-8 space-y-5">
