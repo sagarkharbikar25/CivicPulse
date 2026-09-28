@@ -16,9 +16,30 @@ const upload = multer({
 });
 
 /**
- * Helper: Matches region name or guess against registered municipal wards
+ * Helper: Matches region name or GPS coordinates against registered municipal wards
  */
-function resolveWard(regionInput, regions) {
+function resolveWard(regionInput, regions, latitude, longitude) {
+  // 1. If high-precision device GPS coordinates are provided, find nearest ward
+  if (latitude !== undefined && longitude !== undefined && latitude !== null && longitude !== null) {
+    const lat = Number(latitude);
+    const lng = Number(longitude);
+    if (!isNaN(lat) && !isNaN(lng) && (lat !== 0 || lng !== 0)) {
+      let nearest = regions[0];
+      let minDistance = Infinity;
+      for (const reg of regions) {
+        const dLat = Number(reg.latitude) - lat;
+        const dLng = Number(reg.longitude) - lng;
+        const dist = Math.sqrt(dLat * dLat + dLng * dLng);
+        if (dist < minDistance) {
+          minDistance = dist;
+          nearest = reg;
+        }
+      }
+      if (nearest) return nearest;
+    }
+  }
+
+  // 2. Text keyword query match
   if (!regionInput) return regions[0];
   const query = regionInput.toLowerCase().trim();
   const matched = regions.find(r => r.region_name.toLowerCase().includes(query));
@@ -67,9 +88,16 @@ router.post('/text', submissionRateLimiter, sanitizeCitizenInput, async (req, re
     // 1. LLM Reasoning & Classification Call
     const aiResult = await classifyComplaint(raw_text);
 
-    // 2. Resolve target ward (explicit preference -> LLM guess -> fallback ward)
+    // 2. Resolve target ward (explicit preference -> device GPS -> LLM guess -> fallback ward)
     const regions = await getRegions();
-    const targetWard = resolveWard(region_name || aiResult.region_guess, regions);
+    const targetWard = resolveWard(region_name || aiResult.region_guess, regions, latitude, longitude);
+
+    const hasGpsCoords = latitude !== undefined && latitude !== null && !isNaN(Number(latitude)) && Number(latitude) !== 0;
+    const finalLat = hasGpsCoords ? Number(latitude) : targetWard.latitude;
+    const finalLng = hasGpsCoords ? Number(longitude) : targetWard.longitude;
+    const finalRegionName = (region_name && region_name.trim().length > 0)
+      ? region_name.trim()
+      : targetWard.region_name;
 
     // 3. Compute Multi-Factor Urgency Score
     // Severity from LLM (0-10) scaled to weight (0-100)
@@ -88,9 +116,9 @@ router.post('/text', submissionRateLimiter, sanitizeCitizenInput, async (req, re
       language_detected: aiResult.language_detected || 'en',
       translated_text: aiResult.translated_text || raw_text.trim(),
       category: aiResult.category || 'other',
-      latitude: Number(latitude) || targetWard.latitude,
-      longitude: Number(longitude) || targetWard.longitude,
-      region_name: targetWard.region_name,
+      latitude: finalLat,
+      longitude: finalLng,
+      region_name: finalRegionName,
       urgency_score: urgency,
       status: aiResult.status || 'new',
     });
@@ -164,9 +192,16 @@ router.post('/voice', submissionRateLimiter, upload.single('audio'), async (req,
     // 3. LLM Reasoning & Classification Call
     const aiResult = await classifyComplaint(transcribedText);
 
-    // 4. Resolve target ward
+    // 4. Resolve target ward (device GPS -> region name -> LLM guess)
     const regions = await getRegions();
-    const targetWard = resolveWard(region_name || aiResult.region_guess, regions);
+    const targetWard = resolveWard(region_name || aiResult.region_guess, regions, latitude, longitude);
+
+    const hasGpsCoords = latitude !== undefined && latitude !== null && !isNaN(Number(latitude)) && Number(latitude) !== 0;
+    const finalLat = hasGpsCoords ? Number(latitude) : targetWard.latitude;
+    const finalLng = hasGpsCoords ? Number(longitude) : targetWard.longitude;
+    const finalRegionName = (region_name && region_name.trim().length > 0)
+      ? region_name.trim()
+      : targetWard.region_name;
 
     // 5. Compute Multi-Factor Urgency Score
     const severityWeight = Math.round(aiResult.severity * 10);
@@ -184,9 +219,9 @@ router.post('/voice', submissionRateLimiter, upload.single('audio'), async (req,
       language_detected: sttResult.language_detected || aiResult.language_detected || 'en',
       translated_text: aiResult.translated_text || transcribedText,
       category: aiResult.category || 'other',
-      latitude: Number(latitude) || targetWard.latitude,
-      longitude: Number(longitude) || targetWard.longitude,
-      region_name: targetWard.region_name,
+      latitude: finalLat,
+      longitude: finalLng,
+      region_name: finalRegionName,
       urgency_score: urgency,
       status: aiResult.status || 'new',
     });

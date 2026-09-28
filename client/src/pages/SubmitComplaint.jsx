@@ -201,6 +201,7 @@ export default function SubmitComplaint({ regions = [], onComplaintSubmitted, on
       {/* Voice Mode */}
       {inputMode === 'voice' && (
         <VoiceRecorder
+          regions={regions}
           onSubmissionComplete={(newSub, fullResult) => {
             if (onComplaintSubmitted) onComplaintSubmitted(newSub, fullResult);
           }}

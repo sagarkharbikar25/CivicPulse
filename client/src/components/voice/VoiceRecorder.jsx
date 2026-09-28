@@ -3,7 +3,7 @@ import Card from '../ui/Card';
 import Button from '../ui/Button';
 import Badge from '../ui/Badge';
 import TranscriptPreview from './TranscriptPreview';
-import { MicIcon, PulseIcon, SendIcon, AlertIcon } from '../icons';
+import { MicIcon, PulseIcon, SendIcon, AlertIcon, MapPinIcon } from '../icons';
 
 // 4 Pre-Tested Demo Scenarios for Instant Stage Rehearsals & Fail-Safe Demo Mode
 const DEMO_SCENARIOS = [
@@ -13,6 +13,7 @@ const DEMO_SCENARIOS = [
     lang: 'HI',
     text: 'Hamare chawl me 90 feet road par main paani pipe phat gaya hai, 3 din se peene ka paani nahi aa raha.',
     region: 'Ward 12 - Dharavi / Shahu Nagar',
+    coords: { latitude: 19.0402, longitude: 72.8508 },
   },
   {
     id: 'demo-marathi-road',
@@ -20,6 +21,7 @@ const DEMO_SCENARIOS = [
     lang: 'MR',
     text: 'Kurla station jawal motha khadda padla ahe, ambulance adakli hoti kal ratri.',
     region: 'Ward 9 - Kurla West / LBS Marg',
+    coords: { latitude: 19.0688, longitude: 72.8797 },
   },
   {
     id: 'demo-en-electricity',
@@ -27,6 +29,7 @@ const DEMO_SCENARIOS = [
     lang: 'EN',
     text: 'High voltage transformer spark and oil leakage outside school gate on Hill Road.',
     region: 'Ward 4 - Bandra West / Hill Road',
+    coords: { latitude: 19.0596, longitude: 72.8295 },
   },
   {
     id: 'demo-en-it',
@@ -34,10 +37,11 @@ const DEMO_SCENARIOS = [
     lang: 'EN',
     text: 'Underground fiber trench left open on Hinjewadi Phase 2 main road causing traffic chaos.',
     region: 'Ward 22 - Hinjewadi IT Corridor',
+    coords: { latitude: 18.5913, longitude: 73.7389 },
   },
 ];
 
-export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap }) {
+export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap, regions = [] }) {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -47,12 +51,87 @@ export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap }) {
   const [selectedDemo, setSelectedDemo] = useState(null);
   const [liveTranscript, setLiveTranscript] = useState('');
   const [selectedLang, setSelectedLang] = useState('hi-IN'); // Default to Hindi/Hinglish
+  const [manualWard, setManualWard] = useState('');
+
+  // Real-Time Device GPS State
+  const [gpsStatus, setGpsStatus] = useState({
+    status: 'locating',
+    coords: null,
+    accuracy: null,
+    wardName: null,
+    text: 'Acquiring real-time device GPS coordinates...',
+  });
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const timerRef = useRef(null);
   const recognitionRef = useRef(null);
   const transcriptAccumulatorRef = useRef('');
+
+  // Acquire real-time device GPS location
+  const detectDeviceLocation = () => {
+    if (!navigator.geolocation) {
+      setGpsStatus({
+        status: 'unsupported',
+        coords: null,
+        wardName: regions[0]?.region_name || 'Ward 12 - Dharavi / Shahu Nagar',
+        text: 'GPS geolocation unsupported on this device',
+      });
+      return;
+    }
+
+    setGpsStatus(prev => ({
+      ...prev,
+      status: 'locating',
+      text: 'Acquiring real-time device GPS coordinates...',
+    }));
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude, accuracy } = pos.coords;
+        const safeRegions = Array.isArray(regions) && regions.length > 0 ? regions : [];
+        let nearest = safeRegions[0];
+        let minDistance = Infinity;
+
+        safeRegions.forEach((reg) => {
+          if (reg.latitude && reg.longitude) {
+            const dLat = Number(reg.latitude) - latitude;
+            const dLng = Number(reg.longitude) - longitude;
+            const dist = Math.sqrt(dLat * dLat + dLng * dLng);
+            if (dist < minDistance) {
+              minDistance = dist;
+              nearest = reg;
+            }
+          }
+        });
+
+        const detectedWardName = nearest ? nearest.region_name : 'Detected Device Location';
+
+        setGpsStatus({
+          status: 'locked',
+          coords: { latitude, longitude },
+          accuracy: Math.round(accuracy),
+          wardName: detectedWardName,
+          text: `GPS Locked: ${latitude.toFixed(4)}, ${longitude.toFixed(4)} (±${Math.round(accuracy)}m • ${detectedWardName})`,
+        });
+      },
+      (err) => {
+        console.warn('[VoiceRecorder GPS Notice]', err.message);
+        setGpsStatus({
+          status: 'denied',
+          coords: null,
+          wardName: regions[0]?.region_name || 'Ward 12 - Dharavi / Shahu Nagar',
+          text: 'Location permission disabled. Click to retry or choose ward below.',
+        });
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+    );
+  };
+
+  // Auto-detect GPS on component mount
+  useEffect(() => {
+    detectDeviceLocation();
+  }, [regions]);
 
   // Timer logic for recording duration
   useEffect(() => {
@@ -148,8 +227,8 @@ export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap }) {
     }
   };
 
-  // Submit voice payload to API
-  const submitVoicePayload = async (audioBlob, spokenText) => {
+  // Submit voice payload to API with real GPS coordinates
+  const submitVoicePayload = async (audioBlob, spokenText, overrideLocation) => {
     setIsProcessing(true);
     setProcessingStep('1/3 Transcribing voice with multilingual engine...');
     setErrorMessage(null);
@@ -162,6 +241,18 @@ export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap }) {
       if (spokenText) {
         formData.append('sample_text', spokenText);
         formData.append('live_transcript', spokenText);
+      }
+
+      // Attach Real-Time Device GPS or Selected Ward
+      const activeCoords = overrideLocation?.coords || gpsStatus.coords;
+      const activeWard = manualWard || overrideLocation?.wardName || gpsStatus.wardName;
+
+      if (activeCoords?.latitude && activeCoords?.longitude) {
+        formData.append('latitude', String(activeCoords.latitude));
+        formData.append('longitude', String(activeCoords.longitude));
+      }
+      if (activeWard) {
+        formData.append('region_name', activeWard);
       }
 
       setProcessingStep('2/3 Running Gemini reasoning & entity classification...');
@@ -195,6 +286,8 @@ export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap }) {
       const isPower = spokenText?.toLowerCase().includes('spark') || spokenText?.toLowerCase().includes('transformer') || spokenText?.toLowerCase().includes('light') || spokenText?.toLowerCase().includes('bijli');
 
       const resolvedText = spokenText || 'Main pipeline burst near 90 Feet Road Dharavi, clean drinking water flowing into open drain for 3 days now.';
+      const activeCoords = overrideLocation?.coords || gpsStatus.coords || { latitude: 19.0402, longitude: 72.8508 };
+      const activeWard = manualWard || overrideLocation?.wardName || gpsStatus.wardName || 'Ward 12 - Dharavi / Shahu Nagar';
 
       const fallbackResult = {
         success: true,
@@ -208,11 +301,11 @@ export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap }) {
           category: isWater ? 'water' : isPower ? 'electricity' : 'roads',
           language_detected: isMarathi ? 'mr' : isHindi ? 'hi' : 'en',
           translated_text: isHindi
-            ? 'Water main pipeline has burst near 90 Feet Road, clean drinking water shortage for 3 days.'
+            ? 'Water main pipeline has burst, causing clean drinking water shortage for 3 days.'
             : isMarathi
-            ? 'Large sinkhole formed near Kurla station, ambulance was trapped.'
+            ? 'Large sinkhole formed near station, ambulance was trapped.'
             : resolvedText,
-          region_guess: isMarathi ? 'Ward 9 - Kurla West / LBS Marg' : 'Ward 12 - Dharavi / Shahu Nagar',
+          region_guess: activeWard,
           severity_score_10: 8.8,
           one_line_summary: resolvedText.slice(0, 60),
           fallback_used: true,
@@ -222,9 +315,9 @@ export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap }) {
           raw_input_type: 'voice',
           raw_text: resolvedText,
           category: isWater ? 'water' : isPower ? 'electricity' : 'roads',
-          latitude: isMarathi ? 19.0688 : 19.0402,
-          longitude: isMarathi ? 72.8797 : 72.8508,
-          region_name: isMarathi ? 'Ward 9 - Kurla West / LBS Marg' : 'Ward 12 - Dharavi / Shahu Nagar',
+          latitude: activeCoords.latitude,
+          longitude: activeCoords.longitude,
+          region_name: activeWard,
           urgency_score: 88,
           status: 'classified',
           created_at: new Date().toISOString(),
@@ -232,10 +325,10 @@ export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap }) {
         priority_impact: {
           total_projects: 10,
           top_policy_action: isWater
-            ? 'Deploy emergency pipeline repair crew and install secondary 50,000L potable distribution manifold in Ward 12 - Dharavi.'
+            ? `Deploy emergency pipeline repair crew and install secondary 50,000L potable distribution manifold in ${activeWard}.`
             : isPower
             ? 'Dispatch emergency high-voltage grid repair crew and deploy auxiliary generator.'
-            : 'Initiate rapid cold-mix asphalt pothole repair and structural road surface grading in Ward 9 - Kurla.',
+            : `Initiate rapid cold-mix asphalt pothole repair and structural road surface grading in ${activeWard}.`,
         },
       };
 
@@ -255,7 +348,10 @@ export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap }) {
 
     // Create lightweight simulated audio wave header blob
     const dummyBlob = new Blob(['RIFF....WAVEfmt '], { type: 'audio/webm' });
-    await submitVoicePayload(dummyBlob, scenario.text);
+    await submitVoicePayload(dummyBlob, scenario.text, {
+      coords: scenario.coords,
+      wardName: scenario.region,
+    });
     setSelectedDemo(null);
   };
 
@@ -273,7 +369,7 @@ export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap }) {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,rgba(255,255,255,0.06),transparent_65%)] pointer-events-none" />
 
           {/* Heading */}
-          <div className="relative z-10 mb-6">
+          <div className="relative z-10 mb-5">
             <span className="text-[11px] font-mono tracking-widest uppercase text-zinc-400 bg-white/5 px-3 py-1 rounded-full border border-white/10">
               WOW Feature • Sub-5s Voice Prioritization
             </span>
@@ -283,6 +379,30 @@ export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap }) {
             <p className="text-xs text-zinc-400 max-w-md mx-auto leading-relaxed">
               Whisper STT transcribes in Hindi, Marathi, or English. Gemini classifies category, extracts ward location, and recalculates the city heatmap in real-time.
             </p>
+          </div>
+
+          {/* Real-Time Device GPS Bar */}
+          <div className="relative z-10 flex flex-wrap items-center justify-center gap-2 mb-4">
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-mono border transition-all ${
+              gpsStatus.status === 'locked'
+                ? 'bg-cyan-950/40 border-cyan-500/40 text-cyan-300'
+                : gpsStatus.status === 'locating'
+                ? 'bg-amber-950/40 border-amber-500/40 text-amber-300 animate-pulse'
+                : 'bg-white/5 border-white/10 text-zinc-400'
+            }`}>
+              <MapPinIcon className={`w-3.5 h-3.5 shrink-0 ${gpsStatus.status === 'locked' ? 'text-cyan-400' : 'text-zinc-500'}`} />
+              <span className="truncate max-w-xs">{gpsStatus.text}</span>
+            </div>
+
+            <button
+              type="button"
+              disabled={isRecording || isProcessing}
+              onClick={detectDeviceLocation}
+              title="Re-query device GPS hardware"
+              className="px-2.5 py-1 rounded-full text-[11px] font-mono bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-300 hover:text-white cursor-pointer transition-all"
+            >
+              ↻ Recalibrate GPS
+            </button>
           </div>
 
           {/* Language Selector for Live STT */}
