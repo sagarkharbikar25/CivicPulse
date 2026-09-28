@@ -105,14 +105,30 @@ export async function getSubmissions({ region, category, status, limit = 50, sor
 export async function createSubmission(submissionData) {
   if (supabaseClient) {
     try {
+      const row = {
+        raw_input_type: submissionData.raw_input_type || 'text',
+        raw_text: submissionData.raw_text,
+        language_detected: submissionData.language_detected || 'en',
+        translated_text: submissionData.translated_text || submissionData.raw_text,
+        category: submissionData.category || 'other',
+        latitude: Number(submissionData.latitude) || 19.0402,
+        longitude: Number(submissionData.longitude) || 72.8508,
+        region_name: submissionData.region_name || 'Ward 12 - Dharavi / Shahu Nagar',
+        urgency_score: Number(submissionData.urgency_score) || 75,
+        status: submissionData.status || 'classified',
+      };
+
       const { data, error } = await supabaseClient
         .from('submissions')
-        .insert([submissionData])
+        .insert([row])
         .select()
         .single();
 
       if (error) throw error;
-      if (data) return data;
+      if (data) {
+        localStore.addSubmission(data);
+        return data;
+      }
     } catch (err) {
       console.warn('[DB] Supabase createSubmission failed, falling back:', err.message);
     }
@@ -148,9 +164,24 @@ export async function getPriorityProjects() {
 export async function syncPriorityProjects(projects) {
   if (supabaseClient && projects.length > 0) {
     try {
-      // Clear and re-insert or upsert
+      const sanitized = projects.map(p => {
+        const row = {
+          region_name: p.region_name,
+          category: p.category,
+          submission_count: Number(p.submission_count) || 1,
+          avg_urgency: Number(p.avg_urgency) || 75,
+          final_priority_rank: Number(p.final_priority_rank) || 1,
+          recommended_action: p.recommended_action || 'Public works intervention required.',
+        };
+        if (p.id && typeof p.id === 'string' && p.id.length === 36 && p.id.includes('-')) {
+          row.id = p.id;
+        }
+        return row;
+      });
+
+      // Clear and re-insert priority projects
       await supabaseClient.from('priority_projects').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      const { data, error } = await supabaseClient.from('priority_projects').insert(projects).select();
+      const { data, error } = await supabaseClient.from('priority_projects').insert(sanitized).select();
       if (error) throw error;
       return data;
     } catch (err) {
@@ -167,6 +198,14 @@ export async function syncPriorityProjects(projects) {
 export async function recomputeAll() {
   const regions = await getRegions();
   const submissions = await getSubmissions({ limit: 1000 });
+  
+  if (Array.isArray(regions) && regions.length > 0) {
+    localStore.regions = regions;
+  }
+  if (Array.isArray(submissions) && submissions.length > 0) {
+    localStore.submissions = submissions;
+  }
+
   const result = localStore.recomputeScores();
 
   if (supabaseClient) {

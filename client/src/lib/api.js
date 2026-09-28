@@ -1,4 +1,5 @@
 import { MOCK_REGIONS, MOCK_SUBMISSIONS, MOCK_PRIORITIES } from './mockData';
+import { supabase, isSupabaseLive } from './supabaseClient';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
@@ -38,7 +39,20 @@ export async function fetchSubmissions(filters = {}) {
     const items = Array.isArray(json) ? json : (json.data || []);
     return Array.isArray(items) && items.length > 0 ? items : localSubmissions;
   } catch {
-    // Fallback to local data
+    // 1. Direct Supabase Query
+    if (isSupabaseLive && supabase) {
+      try {
+        let q = supabase.from('submissions').select('*');
+        if (filters.category && filters.category !== 'all') q = q.eq('category', filters.category.toLowerCase());
+        if (filters.status && filters.status !== 'all') q = q.eq('status', filters.status.toLowerCase());
+        const { data, error } = await q.order('created_at', { ascending: false }).limit(50);
+        if (!error && Array.isArray(data) && data.length > 0) return data;
+      } catch (e) {
+        console.warn('[Supabase Direct Submissions Fallback Error]', e.message);
+      }
+    }
+
+    // 2. Local Fallback
     let filtered = [...localSubmissions];
     if (filters.category && filters.category !== 'all') {
       filtered = filtered.filter(s => s.category.toLowerCase() === filters.category.toLowerCase());
@@ -58,6 +72,18 @@ export async function fetchPriorities() {
     const items = Array.isArray(json) ? json : (json.data || []);
     return Array.isArray(items) && items.length > 0 ? items : localPriorities;
   } catch {
+    // Direct Supabase Query
+    if (isSupabaseLive && supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('priority_projects')
+          .select('*')
+          .order('final_priority_rank', { ascending: true });
+        if (!error && Array.isArray(data) && data.length > 0) return data;
+      } catch (e) {
+        console.warn('[Supabase Direct Priorities Fallback Error]', e.message);
+      }
+    }
     return localPriorities;
   }
 }
@@ -103,6 +129,14 @@ export async function fetchRegions() {
     const items = Array.isArray(json) ? json : (json.data || []);
     return Array.isArray(items) && items.length > 0 ? items : MOCK_REGIONS;
   } catch {
+    if (isSupabaseLive && supabase) {
+      try {
+        const { data, error } = await supabase.from('region_index').select('*').order('infra_gap_score', { ascending: false });
+        if (!error && Array.isArray(data) && data.length > 0) return data;
+      } catch (e) {
+        console.warn('[Supabase Direct Regions Fallback Error]', e.message);
+      }
+    }
     return MOCK_REGIONS;
   }
 }
