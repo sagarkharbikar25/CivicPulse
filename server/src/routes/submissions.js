@@ -99,7 +99,7 @@ router.post('/text', submissionRateLimiter, sanitizeCitizenInput, async (req, re
     const finalLng = hasGpsCoords ? Number(longitude) : targetWard.longitude;
     const finalRegionName = (region_name && region_name.trim().length > 0)
       ? region_name.trim()
-      : targetWard.region_name;
+      : (hasGpsCoords ? `Nagpur (${finalLat.toFixed(4)}, ${finalLng.toFixed(4)})` : targetWard.region_name);
 
     // 3. Compute Multi-Factor Urgency Score
     // Severity from LLM (0-10) scaled to weight (0-100)
@@ -204,7 +204,7 @@ router.post('/voice', submissionRateLimiter, upload.single('audio'), async (req,
     const finalLng = hasGpsCoords ? Number(longitude) : targetWard.longitude;
     const finalRegionName = (region_name && region_name.trim().length > 0)
       ? region_name.trim()
-      : targetWard.region_name;
+      : (hasGpsCoords ? `Nagpur (${finalLat.toFixed(4)}, ${finalLng.toFixed(4)})` : targetWard.region_name);
 
     // 5. Compute Multi-Factor Urgency Score
     const severityWeight = Math.round(aiResult.severity * 10);

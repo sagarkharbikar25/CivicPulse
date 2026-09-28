@@ -59,9 +59,9 @@ export default function LeafletMapView({
           <div class="p-1 space-y-1 text-xs font-mono select-none min-w-[200px]">
             <div class="flex items-center gap-1.5 text-cyan-400 font-bold uppercase text-[10px]">
               <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
-              <span>Your Real-Time Device Location</span>
+              <span>Your Current Location</span>
             </div>
-            <div class="font-bold text-white text-xs">${loc.locality || 'Nagpur'}</div>
+            <div class="font-bold text-white text-xs">${loc.locality && loc.locality !== 'Nagpur' && loc.locality !== 'Nagpur City' ? `${loc.locality}, Nagpur` : `Nagpur (${loc.latitude.toFixed(4)}, ${loc.longitude.toFixed(4)})`}</div>
             <p class="text-zinc-300 text-[10px]">${loc.fullAddress || 'Live GPS Locked'}</p>
             <div class="text-zinc-400 text-[10px] pt-1 border-t border-white/10">
               ${loc.latitude.toFixed(4)}, ${loc.longitude.toFixed(4)} (±${loc.accuracy}m)
@@ -321,7 +321,7 @@ export default function LeafletMapView({
               className="glass-pill px-3 py-1.5 rounded-full text-cyan-300 hover:text-white flex items-center gap-1.5 text-xs font-mono transition-all cursor-pointer hover:border-cyan-400/50"
             >
               <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
-              <span>Real Location ({userLocation.city || 'Nagpur'})</span>
+              <span>Current Location ({userLocation.city || 'Nagpur'})</span>
             </button>
           )}
 

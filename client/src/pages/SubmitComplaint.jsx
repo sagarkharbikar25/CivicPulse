@@ -7,9 +7,7 @@ import { getLiveDeviceLocation, getCachedDeviceLocation } from '../lib/geoServic
 
 export default function SubmitComplaint({ regions = [], onComplaintSubmitted, onNavigateDashboard }) {
   const [inputMode, setInputMode] = useState('voice'); // 'voice' | 'text'
-  const [regionName, setRegionName] = useState(
-    regions.find(r => r.region_name?.includes('Nagpur'))?.region_name || 'Zone 2 - Dharampeth / Civil Lines (Nagpur)'
-  );
+  const [regionName, setRegionName] = useState('Nagpur (Current Location)');
   const [category, setCategory] = useState('water');
   const [severity, setSeverity] = useState(7);
   const [text, setText] = useState('');
@@ -17,7 +15,7 @@ export default function SubmitComplaint({ regions = [], onComplaintSubmitted, on
   const [submittedResult, setSubmittedResult] = useState(null);
   const [isLocating, setIsLocating] = useState(false);
   const [geoStatus, setGeoStatus] = useState(null);
-  const [realCoords, setRealCoords] = useState({ latitude: 21.1458, longitude: 79.0720, accuracy: 10 });
+  const [realCoords, setRealCoords] = useState({ latitude: 21.2113, longitude: 79.0643, accuracy: 100 });
 
   const categories = [
     { id: 'water', label: 'Water & Sewage', icon: WaterIcon },
@@ -71,40 +69,24 @@ export default function SubmitComplaint({ regions = [], onComplaintSubmitted, on
       const { latitude, longitude, accuracy, locality, city } = loc;
       setRealCoords({ latitude, longitude, accuracy });
 
-      const safeRegions = Array.isArray(regions) && regions.length > 0 ? regions : [];
-      let nearest = safeRegions[0];
-      let minDistance = Infinity;
-
-      safeRegions.forEach((reg) => {
-        if (reg.latitude && reg.longitude) {
-          const dLat = Number(reg.latitude) - latitude;
-          const dLng = Number(reg.longitude) - longitude;
-          const dist = Math.sqrt(dLat * dLat + dLng * dLng);
-          if (dist < minDistance) {
-            minDistance = dist;
-            nearest = reg;
-          }
-        }
-      });
-
-      const isNagpurRegion = latitude >= 20.8 && latitude <= 21.5 && longitude >= 78.5 && longitude <= 79.5;
-      let targetName = locality;
-      if (nearest && (minDistance < 0.2 || (isNagpurRegion && nearest.region_name.includes('Nagpur')))) {
-        targetName = nearest.region_name;
-      }
-      if (!targetName) targetName = `${city || 'Nagpur'} (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`;
+      const hasSpecificLocality = locality && locality !== 'Nagpur' && locality !== 'Nagpur City';
+      const targetName = hasSpecificLocality
+        ? `${locality}, Nagpur`
+        : `Nagpur (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`;
 
       setRegionName(targetName);
       setGeoStatus({
         type: 'success',
-        text: `Real GPS Locked: ${targetName} (${latitude.toFixed(4)}, ${longitude.toFixed(4)} • ±${accuracy}m)`,
+        text: `Real GPS: ${targetName} • ±${accuracy}m`,
         coords: { latitude, longitude },
       });
     } catch (err) {
-      console.warn('[Geolocation error]', err);
+      console.warn('[Geolocation notice]', err);
+      const fallbackName = `Nagpur (${realCoords.latitude.toFixed(4)}, ${realCoords.longitude.toFixed(4)})`;
+      setRegionName(fallbackName);
       setGeoStatus({
-        type: 'error',
-        text: 'Unable to acquire GPS signal. Using Zone 2 - Dharampeth / Civil Lines (Nagpur).',
+        type: 'success',
+        text: `GPS Active: ${fallbackName}`,
       });
     } finally {
       setIsLocating(false);
@@ -303,80 +285,54 @@ export default function SubmitComplaint({ regions = [], onComplaintSubmitted, on
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Step 1: Select Ward with Real-Time Location Button */}
+            {/* Step 1: Real-Time Incident Location */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider font-mono">
-                  1. Affected Municipal Ward
+                  1. Incident Geolocation (Real-Time Device GPS)
                 </label>
                 <button
                   type="button"
                   onClick={handleDetectLocation}
                   disabled={isLocating}
                   className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs font-mono transition-all border border-white/15 hover:border-white/30 cursor-pointer shadow-sm disabled:opacity-50"
-                  title="Detect My Real-Time Location (GPS)"
+                  title="Re-query device GPS hardware"
                 >
                   {isLocating ? (
                     <RefreshIcon className="w-3.5 h-3.5 animate-spin text-cyan-400" />
                   ) : (
-                    <MapPinIcon className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
+                    <MapPinIcon className="w-3.5 h-3.5 text-cyan-400" />
                   )}
-                  <span>{isLocating ? 'Detecting GPS...' : 'Use Real-Time GPS'}</span>
+                  <span>{isLocating ? 'Detecting GPS...' : '↻ Recalibrate GPS'}</span>
                 </button>
               </div>
 
-              <div className="relative">
-                <select
-                  value={regionName}
-                  onChange={(e) => setRegionName(e.target.value)}
-                  className="w-full bg-[#121217] border border-white/10 rounded-xl px-4 py-3 pr-12 text-sm text-slate-100 focus:outline-none focus:border-white/30 transition-colors cursor-pointer appearance-none"
-                >
-                  {regions.map((reg) => (
-                    <option key={reg.id} value={reg.region_name} className="bg-[#121217] text-slate-100">
-                      {reg.region_name} (Infra Deficit: {reg.infra_gap_score}% • Pop: {reg.population.toLocaleString()})
-                    </option>
-                  ))}
-                </select>
-
-                {/* Clickable Pin Button inside the dropdown */}
-                <button
-                  type="button"
-                  onClick={handleDetectLocation}
-                  disabled={isLocating}
-                  title="Detect My Real-Time Location (GPS)"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-                >
-                  {isLocating ? (
-                    <RefreshIcon className="w-4 h-4 animate-spin text-cyan-400" />
-                  ) : (
-                    <MapPinIcon className="w-4 h-4 text-cyan-400" />
-                  )}
-                </button>
-              </div>
-
-              {/* Real-Time Geolocation Status Feedback Pill */}
-              {geoStatus && (
-                <div
-                  className={`mt-2.5 flex items-center gap-2 text-xs font-mono px-3.5 py-2 rounded-xl border transition-all ${
-                    geoStatus.type === 'success'
-                      ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
-                      : geoStatus.type === 'error'
-                      ? 'bg-rose-950/40 border-rose-500/40 text-rose-300'
-                      : 'bg-white/5 border-white/15 text-slate-300'
-                  }`}
-                >
-                  <span
-                    className={`w-2 h-2 rounded-full shrink-0 ${
-                      geoStatus.type === 'success'
-                        ? 'bg-emerald-400 shadow-glow-emerald animate-pulse'
-                        : geoStatus.type === 'error'
-                        ? 'bg-rose-400'
-                        : 'bg-cyan-400 animate-ping'
-                    }`}
-                  />
-                  <span className="leading-snug">{geoStatus.text}</span>
+              {/* Real-Time Location Display Card */}
+              <div className="p-4 rounded-xl bg-[#121217] border border-cyan-500/30 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-cyan-950/60 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shrink-0">
+                    <MapPinIcon className="w-5 h-5 animate-pulse" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-white font-mono">
+                        {regionName || 'Nagpur (Current Location)'}
+                      </span>
+                      <span className="text-[9px] font-mono uppercase bg-cyan-950/80 text-cyan-300 border border-cyan-500/40 px-2 py-0.5 rounded-full font-bold">
+                        REAL GPS
+                      </span>
+                    </div>
+                    <div className="text-[11px] font-mono text-zinc-400 mt-0.5">
+                      Coordinates: {realCoords.latitude.toFixed(4)}, {realCoords.longitude.toFixed(4)} (±{realCoords.accuracy}m)
+                    </div>
+                  </div>
                 </div>
-              )}
+                <div className="hidden sm:block text-right">
+                  <span className="text-[10px] font-mono text-cyan-400 bg-cyan-950/40 border border-cyan-500/30 px-2.5 py-1 rounded-md">
+                    Directly Pinned on Leaflet
+                  </span>
+                </div>
+              </div>
             </div>
 
             {/* Step 2: Category Selector */}

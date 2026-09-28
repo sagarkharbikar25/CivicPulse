@@ -52,14 +52,13 @@ export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap, regio
   const [selectedDemo, setSelectedDemo] = useState(null);
   const [liveTranscript, setLiveTranscript] = useState('');
   const [selectedLang, setSelectedLang] = useState('hi-IN'); // Default to Hindi/Hinglish
-  const [manualWard, setManualWard] = useState('Zone 2 - Dharampeth / Civil Lines (Nagpur)');
 
   // Real-Time Device GPS State - Defaults to user's real location in Nagpur
   const [gpsStatus, setGpsStatus] = useState({
     status: 'locating',
-    coords: { latitude: 21.1458, longitude: 79.0720 },
-    accuracy: 10,
-    wardName: 'Zone 2 - Dharampeth / Civil Lines (Nagpur)',
+    coords: { latitude: 21.2113, longitude: 79.0643 },
+    accuracy: 100,
+    wardName: 'Nagpur (Current Location)',
     text: 'Acquiring real-time device GPS coordinates (Nagpur)...',
   });
 
@@ -97,21 +96,18 @@ export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap, regio
         }
       });
 
-      const isNagpurRegion = latitude >= 20.8 && latitude <= 21.5 && longitude >= 78.5 && longitude <= 79.5;
-      let targetName = locality;
-      if (nearest && (minDistance < 0.2 || (isNagpurRegion && nearest.region_name.includes('Nagpur')))) {
-        targetName = nearest.region_name;
-      }
-      if (!targetName) targetName = `${city || 'Nagpur'} (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`;
+      const hasSpecificLocality = locality && locality !== 'Nagpur' && locality !== 'Nagpur City';
+      const targetName = hasSpecificLocality
+        ? `${locality}, Nagpur`
+        : `Nagpur (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`;
 
       setGpsStatus({
         status: 'locked',
         coords: { latitude, longitude },
         accuracy,
         wardName: targetName,
-        text: `Real GPS: ${targetName} (${latitude.toFixed(4)}, ${longitude.toFixed(4)} • ±${accuracy}m)`,
+        text: `Real GPS: ${targetName} • ±${accuracy}m`,
       });
-      setManualWard(targetName);
       return;
     } catch (e) {
       console.warn('[VoiceRecorder] Location detection notice:', e.message);
@@ -235,7 +231,7 @@ export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap, regio
 
       // Attach Real-Time Device GPS or Selected Ward
       const activeCoords = overrideLocation?.coords || gpsStatus.coords;
-      const activeWard = manualWard || overrideLocation?.wardName || gpsStatus.wardName;
+      const activeWard = overrideLocation?.wardName || gpsStatus.wardName || `Nagpur (${activeCoords.latitude.toFixed(4)}, ${activeCoords.longitude.toFixed(4)})`;
 
       if (activeCoords?.latitude && activeCoords?.longitude) {
         formData.append('latitude', String(activeCoords.latitude));
@@ -276,8 +272,8 @@ export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap, regio
       const isPower = spokenText?.toLowerCase().includes('spark') || spokenText?.toLowerCase().includes('transformer') || spokenText?.toLowerCase().includes('light') || spokenText?.toLowerCase().includes('bijli');
 
       const resolvedText = spokenText || 'Dharampeth main road par 100mm drinking water feeder line burst ho gayi hai, do din se pure area me paani nahi aa raha.';
-      const activeCoords = overrideLocation?.coords || gpsStatus.coords || { latitude: 21.1458, longitude: 79.0720 };
-      const activeWard = manualWard || overrideLocation?.wardName || gpsStatus.wardName || 'Zone 2 - Dharampeth / Civil Lines (Nagpur)';
+      const activeCoords = overrideLocation?.coords || gpsStatus.coords || { latitude: 21.2113, longitude: 79.0643 };
+      const activeWard = overrideLocation?.wardName || gpsStatus.wardName || `Nagpur (${activeCoords.latitude.toFixed(4)}, ${activeCoords.longitude.toFixed(4)})`;
 
       const fallbackResult = {
         success: true,
@@ -395,33 +391,6 @@ export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap, regio
             </button>
           </div>
 
-          {/* Real Locality / Ward Selection */}
-          <div className="relative z-10 flex flex-wrap items-center justify-center gap-2 mb-4">
-            <span className="text-[10px] font-mono uppercase text-zinc-400">Target Locality / Ward:</span>
-            <select
-              value={manualWard || gpsStatus.wardName || 'Zone 2 - Dharampeth / Civil Lines (Nagpur)'}
-              onChange={(e) => {
-                const selectedVal = e.target.value;
-                setManualWard(selectedVal);
-                const matched = (regions || []).find(r => r.region_name === selectedVal);
-                if (matched) {
-                  setGpsStatus(prev => ({
-                    ...prev,
-                    wardName: matched.region_name,
-                    coords: { latitude: Number(matched.latitude), longitude: Number(matched.longitude) },
-                    text: `Selected Ward: ${matched.region_name}`,
-                  }));
-                }
-              }}
-              className="bg-zinc-900/90 text-white text-xs font-mono border border-white/20 rounded-lg px-3 py-1.5 focus:outline-none focus:border-cyan-400 cursor-pointer"
-            >
-              {(regions || []).map((r) => (
-                <option key={r.id || r.region_name} value={r.region_name} className="bg-zinc-950 text-white">
-                  {r.region_name}
-                </option>
-              ))}
-            </select>
-          </div>
 
           {/* Language Selector for Live STT */}
           <div className="relative z-10 flex items-center justify-center gap-1.5 mb-4">

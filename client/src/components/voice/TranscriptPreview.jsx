@@ -96,14 +96,14 @@ export default function TranscriptPreview({ result, onViewOnMap, onReset }) {
           </div>
           <div className="truncate">
             <div className="text-[10px] font-mono text-zinc-500 uppercase flex items-center gap-1.5">
-              <span>Target Ward</span>
+              <span>Current Location</span>
               {data.latitude && data.longitude && (
                 <span className="text-[9px] font-mono text-cyan-400 font-bold bg-cyan-950/60 px-1 py-0.2 rounded border border-cyan-500/30">
                   REAL GPS
                 </span>
               )}
             </div>
-            <div className="font-medium text-white truncate text-xs">{regionName.split('-')[1] || regionName}</div>
+            <div className="font-medium text-white truncate text-xs">{regionName}</div>
             {data.latitude && data.longitude && (
               <div className="text-[10px] font-mono text-zinc-400">
                 {Number(data.latitude).toFixed(4)}, {Number(data.longitude).toFixed(4)}
