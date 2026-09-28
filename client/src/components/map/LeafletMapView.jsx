@@ -122,10 +122,16 @@ export default function LeafletMapView({
     const lat = Number(spotlightPoint.latitude);
     const lng = Number(spotlightPoint.longitude);
     if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
-      mapInstanceRef.current.flyTo([lat, lng], 14, {
-        duration: 1.5,
-        easeLinearity: 0.25,
-      });
+      mapInstanceRef.current.invalidateSize();
+      setTimeout(() => {
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.invalidateSize();
+          mapInstanceRef.current.flyTo([lat, lng], 15, {
+            duration: 1.2,
+            easeLinearity: 0.25,
+          });
+        }
+      }, 80);
 
       // Dedicated glowing beacon marker for spotlight point
       if (spotlightMarkerRef.current) {
@@ -162,7 +168,11 @@ export default function LeafletMapView({
             <span class="text-rose-400 font-bold">Urgency: ${spotlightPoint.urgency_score || 85}/100</span>
           </div>
         </div>
-      `, { closeButton: false }).openPopup();
+      `, { closeButton: false });
+
+      setTimeout(() => {
+        beacon.openPopup();
+      }, 400);
 
       spotlightMarkerRef.current = beacon;
     }
@@ -253,10 +263,10 @@ export default function LeafletMapView({
       bounds.extend([point.latitude, point.longitude]);
     });
 
-    if (bounds.isValid()) {
+    if (bounds.isValid() && !spotlightPoint) {
       map.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
     }
-  }, [points, activeLayer, selectedPointId, mapReady]);
+  }, [points, activeLayer, selectedPointId, mapReady, spotlightPoint]);
 
   const handleRecenter = () => {
     const map = mapInstanceRef.current;

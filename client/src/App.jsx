@@ -151,19 +151,30 @@ export default function App() {
             onComplaintSubmitted={handleComplaintSubmitted}
             onNavigateDashboard={(targetSub) => {
               if (targetSub) {
+                const lat = Number(targetSub.latitude) || 21.2113;
+                const lng = Number(targetSub.longitude) || 79.0643;
+                const name = targetSub.region_name || 'Nagpur (Current Location)';
                 setSpotlightPoint({
-                  id: targetSub.id,
-                  name: targetSub.region_name,
-                  region_name: targetSub.region_name,
-                  latitude: Number(targetSub.latitude),
-                  longitude: Number(targetSub.longitude),
-                  urgency_score: targetSub.urgency_score,
-                  intensity: targetSub.urgency_score,
-                  category: targetSub.category,
-                  raw_text: targetSub.raw_text,
+                  id: targetSub.id || `sub-${Date.now()}`,
+                  name,
+                  region_name: name,
+                  latitude: lat,
+                  longitude: lng,
+                  urgency_score: targetSub.urgency_score || 85,
+                  intensity: targetSub.urgency_score || 85,
+                  category: targetSub.category || 'Incident',
+                  raw_text: targetSub.raw_text || targetSub.translated_text || '',
+                  _ts: Date.now(),
                 });
               }
               setActiveTab('dashboard');
+              // Smooth scroll directly down to the Leaflet Map section
+              setTimeout(() => {
+                const mapSection = document.getElementById('map-section');
+                if (mapSection) {
+                  mapSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+              }, 120);
             }}
           />
         )}

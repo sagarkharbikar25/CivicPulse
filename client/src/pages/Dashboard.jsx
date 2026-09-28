@@ -20,7 +20,7 @@ export default function Dashboard({
   const [activeLayer, setActiveLayer] = useState('urgency');
   const [categoryFilter, setCategoryFilter] = useState('all');
 
-  // Auto-focus selected ward when spotlightPoint changes
+  // Auto-focus selected ward and smoothly scroll to map when spotlightPoint arrives
   React.useEffect(() => {
     if (spotlightPoint) {
       const match = safeHeatmapData.find(
@@ -29,6 +29,15 @@ export default function Dashboard({
       if (match) {
         setSelectedPointId(match.id);
       }
+
+      // Smoothly scroll down to the Leaflet Map section
+      const timer = setTimeout(() => {
+        const el = document.getElementById('map-section');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 80);
+      return () => clearTimeout(timer);
     }
   }, [spotlightPoint, safeHeatmapData]);
 

@@ -530,7 +530,16 @@ export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap, regio
         <TranscriptPreview
           result={result}
           onViewOnMap={(targetSub) => {
-            if (onViewOnMap) onViewOnMap(targetSub || result?.data);
+            const resolvedSub = targetSub || result?.data || {
+              id: `voice-${Date.now()}`,
+              latitude: gpsStatus.coords.latitude,
+              longitude: gpsStatus.coords.longitude,
+              region_name: gpsStatus.wardName,
+              category: result?.classification?.category || 'water',
+              urgency_score: result?.data?.urgency_score || 85,
+              raw_text: result?.stt?.transcript || '',
+            };
+            if (onViewOnMap) onViewOnMap(resolvedSub);
           }}
           onReset={() => {
             setResult(null);

@@ -138,7 +138,18 @@ export default function TranscriptPreview({ result, onViewOnMap, onReset }) {
           <Button 
             variant="primary" 
             className="flex-1 py-2.5 text-xs font-semibold"
-            onClick={() => onViewOnMap && onViewOnMap(data)}
+            onClick={() => {
+              const payload = {
+                id: data?.id || result?.data?.id || `voice-${Date.now()}`,
+                raw_text: data?.raw_text || result?.stt?.transcript || result?.data?.raw_text || '',
+                category: data?.category || result?.classification?.category || 'water',
+                latitude: Number(data?.latitude ?? result?.data?.latitude ?? 21.2113),
+                longitude: Number(data?.longitude ?? result?.data?.longitude ?? 79.0643),
+                region_name: data?.region_name || result?.data?.region_name || result?.classification?.region_guess || 'Nagpur (Current Location)',
+                urgency_score: data?.urgency_score || result?.data?.urgency_score || 85,
+              };
+              if (onViewOnMap) onViewOnMap(payload);
+            }}
           >
             <MapPinIcon className="w-3.5 h-3.5 mr-1.5" />
             Spotlight on Live Map
