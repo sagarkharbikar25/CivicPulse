@@ -126,7 +126,7 @@ export default function TranscriptPreview({ result, onViewOnMap, onReset }) {
           <Button 
             variant="primary" 
             className="flex-1 py-2.5 text-xs font-semibold"
-            onClick={onViewOnMap}
+            onClick={() => onViewOnMap && onViewOnMap(data)}
           >
             <MapPinIcon className="w-3.5 h-3.5 mr-1.5" />
             Spotlight on Live Map

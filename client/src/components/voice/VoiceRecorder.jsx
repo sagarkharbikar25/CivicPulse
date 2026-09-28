@@ -45,10 +45,14 @@ export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap }) {
   const [errorMessage, setErrorMessage] = useState(null);
   const [result, setResult] = useState(null);
   const [selectedDemo, setSelectedDemo] = useState(null);
+  const [liveTranscript, setLiveTranscript] = useState('');
+  const [selectedLang, setSelectedLang] = useState('hi-IN'); // Default to Hindi/Hinglish
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const timerRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const transcriptAccumulatorRef = useRef('');
 
   // Timer logic for recording duration
   useEffect(() => {
@@ -65,15 +69,18 @@ export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap }) {
     };
   }, [isRecording]);
 
-  // Start real browser microphone
+  // Start real browser microphone with integrated Web Speech Recognition
   const startRecording = async () => {
     try {
       setErrorMessage(null);
       setResult(null);
+      setLiveTranscript('');
+      transcriptAccumulatorRef.current = '';
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunksRef.current = [];
 
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
 
       mediaRecorder.ondataavailable = (event) => {
@@ -85,19 +92,56 @@ export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap }) {
       mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         stream.getTracks().forEach(track => track.stop());
-        await submitVoicePayload(audioBlob, null);
+        const finalText = transcriptAccumulatorRef.current.trim();
+        await submitVoicePayload(audioBlob, finalText || null);
       };
+
+      // Start Browser Native Speech Recognition (Supported in Chrome, Edge, Safari)
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        try {
+          const recognition = new SpeechRecognition();
+          recognition.continuous = true;
+          recognition.interimResults = true;
+          recognition.lang = selectedLang;
+
+          recognition.onresult = (event) => {
+            let current = '';
+            for (let i = 0; i < event.results.length; i++) {
+              current += event.results[i][0].transcript + ' ';
+            }
+            setLiveTranscript(current.trim());
+            transcriptAccumulatorRef.current = current.trim();
+          };
+
+          recognition.onerror = (e) => {
+            console.warn('[Web Speech Recognition warning]', e.error);
+          };
+
+          recognition.start();
+          recognitionRef.current = recognition;
+        } catch (speechErr) {
+          console.warn('[Web Speech Initialization]', speechErr);
+        }
+      }
 
       mediaRecorder.start(250);
       setIsRecording(true);
     } catch (err) {
       console.warn('[Microphone] Permission or access error:', err.message);
-      setErrorMessage('Microphone access unavailable. You can use the instant 1-Click Demo Scenarios below to test the full pipeline.');
+      setErrorMessage('Microphone access unavailable or denied. You can select an instant 1-Click Demo Preset below to test the full pipeline.');
     }
   };
 
   // Stop recording
   const stopRecording = () => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {
+        // ignore
+      }
+    }
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
@@ -105,9 +149,9 @@ export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap }) {
   };
 
   // Submit voice payload to API
-  const submitVoicePayload = async (audioBlob, sampleText) => {
+  const submitVoicePayload = async (audioBlob, spokenText) => {
     setIsProcessing(true);
-    setProcessingStep('1/3 Transcribing voice with Whisper...');
+    setProcessingStep('1/3 Transcribing voice with multilingual engine...');
     setErrorMessage(null);
 
     try {
@@ -115,8 +159,9 @@ export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap }) {
       if (audioBlob) {
         formData.append('audio', audioBlob, 'citizen_voice.webm');
       }
-      if (sampleText) {
-        formData.append('sample_text', sampleText);
+      if (spokenText) {
+        formData.append('sample_text', spokenText);
+        formData.append('live_transcript', spokenText);
       }
 
       setProcessingStep('2/3 Running Gemini reasoning & entity classification...');
@@ -144,41 +189,43 @@ export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap }) {
       console.warn('[Voice Pipeline Network Notice]', err.message);
 
       // Intelligent Stage Fallback Path (Zero-drop guarantee per 04-wow-feature.md)
-      const isHindi = sampleText?.toLowerCase().includes('paani') || sampleText?.toLowerCase().includes('hain');
-      const isMarathi = sampleText?.toLowerCase().includes('jhalay') || sampleText?.toLowerCase().includes('madhe') || sampleText?.toLowerCase().includes('kadha');
-      const isWater = sampleText?.toLowerCase().includes('water') || sampleText?.toLowerCase().includes('paani') || sampleText?.toLowerCase().includes('pipe');
-      const isPower = sampleText?.toLowerCase().includes('spark') || sampleText?.toLowerCase().includes('transformer') || sampleText?.toLowerCase().includes('light');
+      const isHindi = spokenText?.toLowerCase().includes('paani') || spokenText?.toLowerCase().includes('hain') || spokenText?.toLowerCase().includes('pipe');
+      const isMarathi = spokenText?.toLowerCase().includes('jhalay') || spokenText?.toLowerCase().includes('madhe') || spokenText?.toLowerCase().includes('khadda') || spokenText?.toLowerCase().includes('kurla');
+      const isWater = spokenText?.toLowerCase().includes('water') || spokenText?.toLowerCase().includes('paani') || spokenText?.toLowerCase().includes('pipe');
+      const isPower = spokenText?.toLowerCase().includes('spark') || spokenText?.toLowerCase().includes('transformer') || spokenText?.toLowerCase().includes('light') || spokenText?.toLowerCase().includes('bijli');
+
+      const resolvedText = spokenText || 'Main pipeline burst near 90 Feet Road Dharavi, clean drinking water flowing into open drain for 3 days now.';
 
       const fallbackResult = {
         success: true,
-        pipeline_latency_ms: 1240,
+        pipeline_latency_ms: 820,
         stt: {
-          transcript: sampleText || 'Reported municipal hazard requiring immediate capital intervention.',
+          transcript: resolvedText,
           language_detected: isMarathi ? 'mr' : isHindi ? 'hi' : 'en',
-          stt_provider: 'Whisper (Edge Engine)',
+          stt_provider: spokenText ? 'Browser Web Speech (Live Mic)' : 'Whisper (Edge Engine)',
         },
         classification: {
           category: isWater ? 'water' : isPower ? 'electricity' : 'roads',
           language_detected: isMarathi ? 'mr' : isHindi ? 'hi' : 'en',
           translated_text: isHindi
-            ? 'Water supply is completely disrupted for 4 days near 90 feet road, causing severe shortage.'
+            ? 'Water main pipeline has burst near 90 Feet Road, clean drinking water shortage for 3 days.'
             : isMarathi
-            ? 'High-voltage transformer explosion occurred with total power failure for 24 hours.'
-            : sampleText || 'Severe infrastructure hazard requiring emergency public works repair.',
-          region_guess: 'Ward 12 - Dharavi / Shahu Nagar',
+            ? 'Large sinkhole formed near Kurla station, ambulance was trapped.'
+            : resolvedText,
+          region_guess: isMarathi ? 'Ward 9 - Kurla West / LBS Marg' : 'Ward 12 - Dharavi / Shahu Nagar',
           severity_score_10: 8.8,
-          one_line_summary: sampleText || 'Critical public works infrastructure failure',
+          one_line_summary: resolvedText.slice(0, 60),
           fallback_used: true,
         },
         data: {
           id: `voice-${Date.now()}`,
           raw_input_type: 'voice',
-          raw_text: sampleText || 'Audio complaint captured via browser microphone.',
+          raw_text: resolvedText,
           category: isWater ? 'water' : isPower ? 'electricity' : 'roads',
-          latitude: 19.0402,
-          longitude: 72.8508,
-          region_name: 'Ward 12 - Dharavi / Shahu Nagar',
-          urgency_score: 86,
+          latitude: isMarathi ? 19.0688 : 19.0402,
+          longitude: isMarathi ? 72.8797 : 72.8508,
+          region_name: isMarathi ? 'Ward 9 - Kurla West / LBS Marg' : 'Ward 12 - Dharavi / Shahu Nagar',
+          urgency_score: 88,
           status: 'classified',
           created_at: new Date().toISOString(),
         },
@@ -188,7 +235,7 @@ export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap }) {
             ? 'Deploy emergency pipeline repair crew and install secondary 50,000L potable distribution manifold in Ward 12 - Dharavi.'
             : isPower
             ? 'Dispatch emergency high-voltage grid repair crew and deploy auxiliary generator.'
-            : 'Initiate rapid cold-mix asphalt pothole repair and structural road surface grading.',
+            : 'Initiate rapid cold-mix asphalt pothole repair and structural road surface grading in Ward 9 - Kurla.',
         },
       };
 
@@ -238,14 +285,38 @@ export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap }) {
             </p>
           </div>
 
+          {/* Language Selector for Live STT */}
+          <div className="relative z-10 flex items-center justify-center gap-1.5 mb-4">
+            <span className="text-[10px] font-mono uppercase text-zinc-500 mr-1">Input Language:</span>
+            {[
+              { id: 'hi-IN', label: 'Hindi (हिंदी)' },
+              { id: 'mr-IN', label: 'Marathi (मराठी)' },
+              { id: 'en-IN', label: 'English (Indian)' },
+            ].map((lang) => (
+              <button
+                key={lang.id}
+                type="button"
+                disabled={isRecording || isProcessing}
+                onClick={() => setSelectedLang(lang.id)}
+                className={`px-2.5 py-1 rounded-full text-[11px] font-mono transition-all cursor-pointer ${
+                  selectedLang === lang.id
+                    ? 'bg-white text-black font-semibold shadow-glow-white'
+                    : 'bg-white/5 text-zinc-400 hover:text-white border border-white/10'
+                }`}
+              >
+                {lang.label}
+              </button>
+            ))}
+          </div>
+
           {/* Main Record Button with Pulsing Radar Ring */}
           <div className="relative z-10 flex flex-col items-center justify-center my-6">
             <div className="relative flex items-center justify-center">
               {/* Animated Glowing Wave Rings when Recording */}
               {isRecording && (
                 <>
-                  <span className="absolute w-36 h-36 rounded-full border border-white/30 animate-ping opacity-75" />
-                  <span className="absolute w-28 h-28 rounded-full border border-white/40 animate-pulse" />
+                  <span className="absolute w-36 h-36 rounded-full border border-red-500/40 animate-ping opacity-75" />
+                  <span className="absolute w-28 h-28 rounded-full border border-red-500/60 animate-pulse" />
                 </>
               )}
 
@@ -254,7 +325,7 @@ export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap }) {
                 onClick={isRecording ? stopRecording : startRecording}
                 disabled={isProcessing}
                 aria-label={isRecording ? 'Stop recording' : 'Start recording'}
-                className={`relative w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 shadow-2xl ${
+                className={`relative w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 shadow-2xl cursor-pointer ${
                   isRecording
                     ? 'bg-red-500 text-white scale-110 shadow-red-500/40 ring-4 ring-red-500/20'
                     : isProcessing
@@ -288,6 +359,21 @@ export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap }) {
                 </span>
               )}
             </div>
+
+            {/* Live Real-Time Speech Stream Box */}
+            {isRecording && (
+              <div className="mt-4 max-w-md w-full p-3 rounded-xl bg-black/60 border border-red-500/30 text-left animate-fade-in">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+                  <span className="text-[10px] font-mono uppercase text-red-400 font-bold">
+                    Listening & Transcribing Live:
+                  </span>
+                </div>
+                <p className="text-xs text-zinc-200 italic font-sans min-h-[24px]">
+                  {liveTranscript ? `"${liveTranscript}"` : 'Speak into your microphone now...'}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Error Message */}
@@ -311,7 +397,7 @@ export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap }) {
                   type="button"
                   disabled={isProcessing || isRecording}
                   onClick={() => triggerDemoScenario(s)}
-                  className={`p-2.5 rounded-lg border text-left transition-all flex items-start justify-between gap-2 ${
+                  className={`p-2.5 rounded-lg border text-left transition-all flex items-start justify-between gap-2 cursor-pointer ${
                     selectedDemo === s.id
                       ? 'border-white bg-white/10 text-white'
                       : 'border-white/10 bg-black/40 hover:bg-white/5 hover:border-white/20 text-zinc-300'
@@ -336,8 +422,13 @@ export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap }) {
         /* Real-Time Result Transcript & Priority Card */
         <TranscriptPreview
           result={result}
-          onViewOnMap={onViewOnMap}
-          onReset={() => setResult(null)}
+          onViewOnMap={(targetSub) => {
+            if (onViewOnMap) onViewOnMap(targetSub || result?.data);
+          }}
+          onReset={() => {
+            setResult(null);
+            setLiveTranscript('');
+          }}
         />
       )}
     </div>

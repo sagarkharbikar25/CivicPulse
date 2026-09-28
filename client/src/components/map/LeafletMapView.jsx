@@ -14,6 +14,7 @@ export default function LeafletMapView({
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
+  const spotlightMarkerRef = useRef(null);
   const [mapReady, setMapReady] = useState(false);
 
   // Initialize Leaflet Map
@@ -21,8 +22,9 @@ export default function LeafletMapView({
     if (!mapContainerRef.current) return;
     if (mapInstanceRef.current) return;
 
-    const initialLat = 21.1458;
-    const initialLng = 79.0882;
+    // Default to Mumbai municipal coordinates
+    const initialLat = points[0]?.latitude || 19.0500;
+    const initialLng = points[0]?.longitude || 72.8800;
 
     const map = L.map(mapContainerRef.current, {
       center: [initialLat, initialLng],
@@ -50,6 +52,7 @@ export default function LeafletMapView({
 
     return () => {
       clearTimeout(resizeTimer);
+      if (spotlightMarkerRef.current) spotlightMarkerRef.current.remove();
       map.remove();
       mapInstanceRef.current = null;
     };
@@ -60,11 +63,50 @@ export default function LeafletMapView({
     if (!spotlightPoint || !mapInstanceRef.current || !mapReady) return;
     const lat = Number(spotlightPoint.latitude);
     const lng = Number(spotlightPoint.longitude);
-    if (!isNaN(lat) && !isNaN(lng)) {
-      mapInstanceRef.current.flyTo([lat, lng], 13.5, {
+    if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+      mapInstanceRef.current.flyTo([lat, lng], 14, {
         duration: 1.5,
         easeLinearity: 0.25,
       });
+
+      // Dedicated glowing beacon marker for spotlight point
+      if (spotlightMarkerRef.current) {
+        spotlightMarkerRef.current.remove();
+      }
+
+      const beaconIcon = L.divIcon({
+        html: `
+          <div class="relative flex items-center justify-center cursor-pointer" style="width: 50px; height: 50px;">
+            <div class="absolute w-12 h-12 rounded-full bg-cyan-400/30 animate-ping"></div>
+            <div class="absolute w-8 h-8 rounded-full bg-cyan-400/50 animate-pulse"></div>
+            <div class="relative w-7 h-7 rounded-full bg-cyan-400 border-2 border-white shadow-[0_0_15px_#22d3ee] flex items-center justify-center text-black font-bold font-mono text-[11px]">
+              ⚡
+            </div>
+          </div>
+        `,
+        className: 'custom-spotlight-beacon',
+        iconSize: [50, 50],
+        iconAnchor: [25, 25],
+        popupAnchor: [0, -22],
+      });
+
+      const beacon = L.marker([lat, lng], { icon: beaconIcon, zIndexOffset: 2000 }).addTo(mapInstanceRef.current);
+      beacon.bindPopup(`
+        <div class="p-1 space-y-1.5 text-xs font-sans min-w-[210px] select-none">
+          <div class="flex items-center gap-1.5 text-cyan-400 font-bold font-mono uppercase text-[10px]">
+            <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping"></span>
+            <span>Live Grievance Spotlight</span>
+          </div>
+          <div class="font-bold text-white text-xs">${spotlightPoint.region_name || 'Assigned Ward'}</div>
+          <p class="text-zinc-300 text-[11px] italic line-clamp-2 leading-tight">"${spotlightPoint.raw_text || spotlightPoint.category || 'Citizen report'}"</p>
+          <div class="pt-1 flex items-center justify-between text-[10px] font-mono border-t border-white/10">
+            <span class="text-zinc-400 uppercase capitalize">${spotlightPoint.category || 'Incident'}</span>
+            <span class="text-rose-400 font-bold">Urgency: ${spotlightPoint.urgency_score || 85}/100</span>
+          </div>
+        </div>
+      `, { closeButton: false }).openPopup();
+
+      spotlightMarkerRef.current = beacon;
     }
   }, [spotlightPoint, mapReady]);
 

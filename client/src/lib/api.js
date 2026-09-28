@@ -9,19 +9,28 @@ let localPriorities = [...MOCK_PRIORITIES];
 
 function getFallbackHeatmap() {
   return MOCK_REGIONS.map(r => {
-    const related = localSubmissions.filter(s => s.region_name === r.region_name);
-    const intensity = related.length > 0
-      ? related.reduce((acc, curr) => acc + curr.urgency_score, 0) / related.length
-      : r.infra_gap_score;
+    const related = localSubmissions.filter(s => {
+      const subName = (s.region_name || '').toLowerCase();
+      const wardName = (r.region_name || '').toLowerCase();
+      return subName.includes(wardName) || wardName.includes(subName);
+    });
+    const avgUrgency = related.length > 0
+      ? related.reduce((acc, curr) => acc + (Number(curr.urgency_score) || 75), 0) / related.length
+      : null;
+    const intensity = avgUrgency !== null
+      ? Math.round(avgUrgency * 0.65 + r.infra_gap_score * 0.35)
+      : Math.round(r.infra_gap_score * 0.85);
+
     return {
       id: r.id,
       name: r.region_name,
+      region_name: r.region_name,
       latitude: r.latitude,
       longitude: r.longitude,
-      intensity: Math.min(100, Math.round(intensity)),
-      submissionsCount: related.length || 3,
+      intensity: Math.min(100, intensity),
+      submissionsCount: related.length,
       population: r.population,
-      gapScore: r.infra_gap_score,
+      gapScore: Math.round(r.infra_gap_score),
     };
   });
 }
@@ -90,35 +99,64 @@ export async function fetchPriorities() {
 
 export async function fetchHeatmapData() {
   try {
-    const res = await fetch(`${BASE_URL}/api/priority/heatmap`, { signal: AbortSignal.timeout(2500) });
-    if (!res.ok) throw new Error('API failed');
+    const res = await fetch(`${BASE_URL}/api/priority/heatmap`, { signal: AbortSignal.timeout(6000) });
+    if (!res.ok) throw new Error(`API responded with ${res.status}`);
     const json = await res.json();
 
-    // If backend returns GeoJSON FeatureCollection
-    if (json && Array.isArray(json.features) && json.features.length > 0) {
-      return json.features.map((f, idx) => {
-        const coords = f.geometry?.coordinates || [72.85, 19.04];
-        const props = f.properties || {};
-        return {
-          id: props.id || `point-${idx}`,
-          name: props.region_name || 'Municipal Ward',
-          latitude: Number(coords[1]),
-          longitude: Number(coords[0]),
-          intensity: Math.round(Number(props.urgency_score) || 75),
-          submissionsCount: 3,
-          population: 450000,
-          gapScore: Math.round(Number(props.urgency_score) || 70),
-        };
-      });
+    // 1. Direct authentic ward data returned by backend
+    if (json && Array.isArray(json.data) && json.data.length > 0) {
+      return json.data;
     }
 
-    if (Array.isArray(json)) return json;
-    if (Array.isArray(json.data)) return json.data;
-
-    return getFallbackHeatmap();
-  } catch {
-    return getFallbackHeatmap();
+    // 2. Direct array
+    if (Array.isArray(json) && json.length > 0) return json;
+  } catch (err) {
+    console.warn('[API] Priority heatmap fetch failed, attempting direct Supabase query:', err.message);
   }
+
+  // 3. Direct Supabase Query Fallback
+  if (isSupabaseLive && supabase) {
+    try {
+      const [regRes, subRes] = await Promise.all([
+        supabase.from('region_index').select('*').order('infra_gap_score', { ascending: false }),
+        supabase.from('submissions').select('*').limit(300),
+      ]);
+
+      if (!regRes.error && Array.isArray(regRes.data) && regRes.data.length > 0) {
+        const liveSubs = subRes.data || [];
+        return regRes.data.map((r) => {
+          const related = liveSubs.filter((s) => {
+            const subName = (s.region_name || '').toLowerCase();
+            const wardName = (r.region_name || '').toLowerCase();
+            return subName.includes(wardName) || wardName.includes(subName);
+          });
+          const avgUrgency = related.length > 0
+            ? related.reduce((acc, curr) => acc + (Number(curr.urgency_score) || 75), 0) / related.length
+            : null;
+          const intensity = avgUrgency !== null
+            ? Math.round(avgUrgency * 0.65 + Number(r.infra_gap_score) * 0.35)
+            : Math.round(Number(r.infra_gap_score) * 0.85);
+
+          return {
+            id: r.id,
+            name: r.region_name,
+            region_name: r.region_name,
+            latitude: Number(r.latitude),
+            longitude: Number(r.longitude),
+            intensity: Math.min(100, intensity),
+            submissionsCount: related.length,
+            population: Number(r.population) || 450000,
+            gapScore: Math.round(Number(r.infra_gap_score) || 70),
+            recentSubmissions: related.slice(0, 3),
+          };
+        });
+      }
+    } catch (e) {
+      console.warn('[Supabase Direct Heatmap Query Error]', e.message);
+    }
+  }
+
+  return getFallbackHeatmap();
 }
 
 export async function fetchRegions() {

@@ -41,7 +41,11 @@ export const helmetMiddleware = helmet({
 // General API rate limiter (generous in dev/demo mode)
 export const generalRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: process.env.NODE_ENV === 'production' ? 100 : 5000,
+  max: process.env.NODE_ENV === 'production' ? 100 : 10000,
+  skip: (req) => {
+    const ip = req.ip || req.connection?.remoteAddress || '';
+    return ip.includes('127.0.0.1') || ip === '::1' || ip.includes('::ffff:127.0.0.1') || process.env.NODE_ENV !== 'production';
+  },
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -53,7 +57,11 @@ export const generalRateLimiter = rateLimit({
 // Citizen intake rate limiter (generous in dev/demo mode)
 export const submissionRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: process.env.NODE_ENV === 'production' ? 20 : 1000,
+  max: process.env.NODE_ENV === 'production' ? 20 : 5000,
+  skip: (req) => {
+    const ip = req.ip || req.connection?.remoteAddress || '';
+    return ip.includes('127.0.0.1') || ip === '::1' || ip.includes('::ffff:127.0.0.1') || process.env.NODE_ENV !== 'production';
+  },
   standardHeaders: true,
   legacyHeaders: false,
   message: {

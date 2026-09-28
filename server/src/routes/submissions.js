@@ -137,7 +137,8 @@ router.post('/text', submissionRateLimiter, sanitizeCitizenInput, async (req, re
 router.post('/voice', submissionRateLimiter, upload.single('audio'), async (req, res, next) => {
   try {
     const startTime = Date.now();
-    const { region_name, latitude, longitude, sample_text } = req.body;
+    const { region_name, latitude, longitude, sample_text, live_transcript, text } = req.body;
+    const recognizedSpeech = (live_transcript || sample_text || text || '').trim();
 
     // 1. Ingest audio from multipart file, buffer, or sample text
     let audioBuffer = req.file?.buffer;
@@ -149,7 +150,7 @@ router.post('/voice', submissionRateLimiter, upload.single('audio'), async (req,
       buffer: audioBuffer,
       originalname,
       mimetype,
-      sampleText: sample_text,
+      sampleText: recognizedSpeech,
     });
 
     const transcribedText = sttResult.transcript;

@@ -149,7 +149,22 @@ export default function App() {
           <SubmitComplaint
             regions={regions}
             onComplaintSubmitted={handleComplaintSubmitted}
-            onNavigateDashboard={() => setActiveTab('dashboard')}
+            onNavigateDashboard={(targetSub) => {
+              if (targetSub) {
+                setSpotlightPoint({
+                  id: targetSub.id,
+                  name: targetSub.region_name,
+                  region_name: targetSub.region_name,
+                  latitude: Number(targetSub.latitude),
+                  longitude: Number(targetSub.longitude),
+                  urgency_score: targetSub.urgency_score,
+                  intensity: targetSub.urgency_score,
+                  category: targetSub.category,
+                  raw_text: targetSub.raw_text,
+                });
+              }
+              setActiveTab('dashboard');
+            }}
           />
         )}
 

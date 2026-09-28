@@ -204,7 +204,9 @@ export default function SubmitComplaint({ regions = [], onComplaintSubmitted, on
           onSubmissionComplete={(newSub, fullResult) => {
             if (onComplaintSubmitted) onComplaintSubmitted(newSub, fullResult);
           }}
-          onViewOnMap={onNavigateDashboard}
+          onViewOnMap={(targetSub) => {
+            if (onNavigateDashboard) onNavigateDashboard(targetSub);
+          }}
         />
       )}
 
@@ -296,7 +298,7 @@ export default function SubmitComplaint({ regions = [], onComplaintSubmitted, on
                 Submit Another Issue
               </button>
               <button
-                onClick={onNavigateDashboard}
+                onClick={() => onNavigateDashboard && onNavigateDashboard(submittedResult)}
                 className="px-6 py-2.5 rounded-full glass-pill glass-pill-hover text-slate-300 hover:text-white text-xs font-medium cursor-pointer"
               >
                 Inspect On Leaflet Map ↗
