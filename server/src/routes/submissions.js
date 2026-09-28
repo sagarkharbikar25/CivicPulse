@@ -19,12 +19,14 @@ const upload = multer({
  * Helper: Matches region name or GPS coordinates against registered municipal wards
  */
 function resolveWard(regionInput, regions, latitude, longitude) {
+  const nagpurDefault = (regions || []).find(r => r.region_name.includes('Nagpur')) || regions[0];
+
   // 1. If high-precision device GPS coordinates are provided, find nearest ward
   if (latitude !== undefined && longitude !== undefined && latitude !== null && longitude !== null) {
     const lat = Number(latitude);
     const lng = Number(longitude);
     if (!isNaN(lat) && !isNaN(lng) && (lat !== 0 || lng !== 0)) {
-      let nearest = regions[0];
+      let nearest = nagpurDefault;
       let minDistance = Infinity;
       for (const reg of regions) {
         const dLat = Number(reg.latitude) - lat;
@@ -40,10 +42,10 @@ function resolveWard(regionInput, regions, latitude, longitude) {
   }
 
   // 2. Text keyword query match
-  if (!regionInput) return regions[0];
+  if (!regionInput) return nagpurDefault;
   const query = regionInput.toLowerCase().trim();
   const matched = regions.find(r => r.region_name.toLowerCase().includes(query));
-  return matched || regions[0];
+  return matched || nagpurDefault;
 }
 
 /**
@@ -123,13 +125,14 @@ router.post('/text', submissionRateLimiter, sanitizeCitizenInput, async (req, re
       status: aiResult.status || 'new',
     });
 
-    // 5. Dynamic Priority Project Recomputation
+    // 5. Dynamic Priority Project Recomputation & Tailored Grievance Intervention
     const recomputeSummary = await recomputeAll();
-    let topRecommendation = null;
-    if (recomputeSummary?.topProject) {
-      topRecommendation = await generatePolicyRecommendation(recomputeSummary.topProject);
-      recomputeSummary.topProject.recommended_action = topRecommendation;
-    }
+    const submissionIntervention = await generatePolicyRecommendation({
+      region_name: finalRegionName,
+      category: aiResult.category,
+      submission_count: 1,
+      avg_urgency: urgency,
+    });
 
     const processingMs = Date.now() - startTime;
 
@@ -150,7 +153,7 @@ router.post('/text', submissionRateLimiter, sanitizeCitizenInput, async (req, re
       priority_impact: {
         total_projects: recomputeSummary?.projectsCount || 0,
         top_project: recomputeSummary?.topProject || null,
-        top_policy_action: topRecommendation,
+        top_policy_action: submissionIntervention,
       },
     });
   } catch (err) {
@@ -226,13 +229,14 @@ router.post('/voice', submissionRateLimiter, upload.single('audio'), async (req,
       status: aiResult.status || 'new',
     });
 
-    // 7. Dynamic Priority Project Recomputation
+    // 7. Dynamic Priority Project Recomputation & Tailored Grievance Intervention
     const recomputeSummary = await recomputeAll();
-    let topRecommendation = null;
-    if (recomputeSummary?.topProject) {
-      topRecommendation = await generatePolicyRecommendation(recomputeSummary.topProject);
-      recomputeSummary.topProject.recommended_action = topRecommendation;
-    }
+    const submissionIntervention = await generatePolicyRecommendation({
+      region_name: finalRegionName,
+      category: aiResult.category,
+      submission_count: 1,
+      avg_urgency: urgency,
+    });
 
     const processingMs = Date.now() - startTime;
 
@@ -258,7 +262,7 @@ router.post('/voice', submissionRateLimiter, upload.single('audio'), async (req,
       priority_impact: {
         total_projects: recomputeSummary?.projectsCount || 0,
         top_project: recomputeSummary?.topProject || null,
-        top_policy_action: topRecommendation,
+        top_policy_action: submissionIntervention,
       },
     });
   } catch (err) {

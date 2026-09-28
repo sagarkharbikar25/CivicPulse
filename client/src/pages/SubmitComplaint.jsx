@@ -1,12 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, Button, Badge } from '../components/ui';
 import { SendIcon, RoadIcon, WaterIcon, ElectricityIcon, SanitationIcon, AlertIcon, CheckIcon, MapPinIcon, MicIcon, RefreshIcon } from '../components/icons';
 import { submitTextComplaint } from '../lib/api';
 import { VoiceRecorder } from '../components/voice';
+import { getLiveDeviceLocation, getCachedDeviceLocation } from '../lib/geoService';
 
 export default function SubmitComplaint({ regions = [], onComplaintSubmitted, onNavigateDashboard }) {
   const [inputMode, setInputMode] = useState('voice'); // 'voice' | 'text'
-  const [regionName, setRegionName] = useState(regions[0]?.region_name || 'Ward 12 - Dharavi / Shahu Nagar');
+  const [regionName, setRegionName] = useState(
+    regions.find(r => r.region_name?.includes('Nagpur'))?.region_name || 'Zone 2 - Dharampeth / Civil Lines (Nagpur)'
+  );
   const [category, setCategory] = useState('water');
   const [severity, setSeverity] = useState(7);
   const [text, setText] = useState('');
@@ -14,7 +17,7 @@ export default function SubmitComplaint({ regions = [], onComplaintSubmitted, on
   const [submittedResult, setSubmittedResult] = useState(null);
   const [isLocating, setIsLocating] = useState(false);
   const [geoStatus, setGeoStatus] = useState(null);
-  const [realCoords, setRealCoords] = useState(null);
+  const [realCoords, setRealCoords] = useState({ latitude: 21.1458, longitude: 79.0720, accuracy: 10 });
 
   const categories = [
     { id: 'water', label: 'Water & Sewage', icon: WaterIcon },
@@ -30,24 +33,24 @@ export default function SubmitComplaint({ regions = [], onComplaintSubmitted, on
       lang: 'Hindi',
       category: 'water',
       severity: 8,
-      region: 'East Ward - Sector 4',
-      text: 'Yahan 4 din se drinking water supply band hai, tankers bhi nahi aa rahe aur log pareshan hain.',
+      region: 'Zone 2 - Dharampeth / Civil Lines (Nagpur)',
+      text: 'Dharampeth main road par 100mm drinking water feeder line burst ho gayi hai, do din se pure area me paani nahi aa raha.',
     },
     {
-      title: 'Severe Freight Road Potholes (English)',
+      title: 'Sitabuldi Transit Corridor Potholes (English)',
       lang: 'English',
       category: 'roads',
       severity: 7,
-      region: 'Industrial Zone North',
-      text: 'Severe potholes outside industrial sector causing heavy freight truck accidents and tire bursts.',
+      region: 'Zone 4 - Dhantoli / Sitabuldi (Nagpur)',
+      text: 'Severe road surface collapse outside Sitabuldi metro station causing heavy traffic chaos and ambulance delays.',
     },
     {
-      title: 'Settlement Transformer Explosion (Marathi)',
+      title: 'Medical Square Transformer Spark (Marathi)',
       lang: 'Marathi',
       category: 'electricity',
       severity: 9,
-      region: 'Old City Settlement',
-      text: 'Transformer blast jhalay, purya basti madhe light nahi ahe 24 taasapasun, hospital patient sathi problem ahe.',
+      region: 'Zone 3 - Hanuman Nagar / Medical Square (Nagpur)',
+      text: 'Transformer spark jhalay, Medical Square jawal purya line madhe light nahi ahe, emergency patient sathi problem ahe.',
     },
   ];
 
@@ -59,67 +62,59 @@ export default function SubmitComplaint({ regions = [], onComplaintSubmitted, on
     setSubmittedResult(null);
   };
 
-  const handleDetectLocation = () => {
-    if (!navigator.geolocation) {
+  const handleDetectLocation = async () => {
+    setIsLocating(true);
+    setGeoStatus({ type: 'locating', text: 'Acquiring real-time device GPS coordinates...' });
+
+    try {
+      const loc = await getLiveDeviceLocation();
+      const { latitude, longitude, accuracy, locality, city } = loc;
+      setRealCoords({ latitude, longitude, accuracy });
+
+      const safeRegions = Array.isArray(regions) && regions.length > 0 ? regions : [];
+      let nearest = safeRegions[0];
+      let minDistance = Infinity;
+
+      safeRegions.forEach((reg) => {
+        if (reg.latitude && reg.longitude) {
+          const dLat = Number(reg.latitude) - latitude;
+          const dLng = Number(reg.longitude) - longitude;
+          const dist = Math.sqrt(dLat * dLat + dLng * dLng);
+          if (dist < minDistance) {
+            minDistance = dist;
+            nearest = reg;
+          }
+        }
+      });
+
+      const isNagpurRegion = latitude >= 20.8 && latitude <= 21.5 && longitude >= 78.5 && longitude <= 79.5;
+      let targetName = locality;
+      if (nearest && (minDistance < 0.2 || (isNagpurRegion && nearest.region_name.includes('Nagpur')))) {
+        targetName = nearest.region_name;
+      }
+      if (!targetName) targetName = `${city || 'Nagpur'} (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`;
+
+      setRegionName(targetName);
+      setGeoStatus({
+        type: 'success',
+        text: `Real GPS Locked: ${targetName} (${latitude.toFixed(4)}, ${longitude.toFixed(4)} • ±${accuracy}m)`,
+        coords: { latitude, longitude },
+      });
+    } catch (err) {
+      console.warn('[Geolocation error]', err);
       setGeoStatus({
         type: 'error',
-        text: 'Geolocation is not supported by your browser.',
+        text: 'Unable to acquire GPS signal. Using Zone 2 - Dharampeth / Civil Lines (Nagpur).',
       });
-      return;
+    } finally {
+      setIsLocating(false);
     }
-
-    setIsLocating(true);
-    setGeoStatus({ type: 'locating', text: 'Acquiring high-precision GPS coordinates from your device...' });
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude, accuracy } = position.coords;
-        setRealCoords({ latitude, longitude, accuracy });
-
-        const safeRegions = Array.isArray(regions) && regions.length > 0 ? regions : [];
-        let nearest = safeRegions[0];
-        let minDistance = Infinity;
-
-        safeRegions.forEach((reg) => {
-          if (reg.latitude && reg.longitude) {
-            const dLat = Number(reg.latitude) - latitude;
-            const dLng = Number(reg.longitude) - longitude;
-            const dist = Math.sqrt(dLat * dLat + dLng * dLng);
-            if (dist < minDistance) {
-              minDistance = dist;
-              nearest = reg;
-            }
-          }
-        });
-
-        if (nearest) {
-          setRegionName(nearest.region_name);
-          setGeoStatus({
-            type: 'success',
-            text: `GPS locked: ${nearest.region_name} (${latitude.toFixed(4)}, ${longitude.toFixed(4)} • ±${Math.round(accuracy)}m)`,
-            coords: { latitude, longitude },
-          });
-        } else {
-          setGeoStatus({
-            type: 'success',
-            text: `GPS locked: ${latitude.toFixed(4)}, ${longitude.toFixed(4)} • ±${Math.round(accuracy)}m`,
-            coords: { latitude, longitude },
-          });
-        }
-        setIsLocating(false);
-      },
-      (err) => {
-        console.warn('[Geolocation error]', err);
-        setIsLocating(false);
-        let msg = 'Unable to acquire GPS signal. Please select your ward manually.';
-        if (err.code === 1) msg = 'Location access denied. Please allow location permissions in your browser.';
-        else if (err.code === 2) msg = 'Location position unavailable. Please choose your ward manually.';
-        else if (err.code === 3) msg = 'GPS request timed out. Please try again.';
-        setGeoStatus({ type: 'error', text: msg });
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
-    );
   };
+
+  // Auto-detect location on initial load
+  useEffect(() => {
+    handleDetectLocation();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import { LayersIcon, RefreshIcon, MapPinIcon } from '../icons';
+import { getLiveDeviceLocation, getCachedDeviceLocation } from '../../lib/geoService';
 
 export default function LeafletMapView({
   points = [],
@@ -15,16 +16,72 @@ export default function LeafletMapView({
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
   const spotlightMarkerRef = useRef(null);
+  const userLocationMarkerRef = useRef(null);
   const [mapReady, setMapReady] = useState(false);
+  const [userLocation, setUserLocation] = useState(getCachedDeviceLocation());
 
-  // Initialize Leaflet Map
+  // Initialize Leaflet Map and acquire real-time device GPS coordinates
   useEffect(() => {
     if (!mapContainerRef.current) return;
     if (mapInstanceRef.current) return;
 
-    // Default to Mumbai municipal coordinates
-    const initialLat = points[0]?.latitude || 19.0500;
-    const initialLng = points[0]?.longitude || 72.8800;
+    // Detect user's authentic live device GPS location
+    getLiveDeviceLocation().then((loc) => {
+      setUserLocation(loc);
+      if (mapInstanceRef.current && loc?.latitude && loc?.longitude) {
+        // Add or update live user marker
+        if (userLocationMarkerRef.current) {
+          userLocationMarkerRef.current.remove();
+        }
+
+        const userIcon = L.divIcon({
+          html: `
+            <div class="relative flex items-center justify-center cursor-pointer" style="width: 48px; height: 48px;">
+              <div class="absolute w-12 h-12 rounded-full bg-cyan-500/30 animate-ping"></div>
+              <div class="absolute w-8 h-8 rounded-full bg-cyan-400/40 animate-pulse"></div>
+              <div class="relative w-6 h-6 rounded-full bg-cyan-400 border-2 border-white shadow-[0_0_15px_#22d3ee] flex items-center justify-center text-black font-bold text-[10px]">
+                📍
+              </div>
+            </div>
+          `,
+          className: 'custom-user-live-beacon',
+          iconSize: [48, 48],
+          iconAnchor: [24, 24],
+          popupAnchor: [0, -20],
+        });
+
+        const userMarker = L.marker([loc.latitude, loc.longitude], {
+          icon: userIcon,
+          zIndexOffset: 3500,
+        }).addTo(mapInstanceRef.current);
+
+        userMarker.bindPopup(`
+          <div class="p-1 space-y-1 text-xs font-mono select-none min-w-[200px]">
+            <div class="flex items-center gap-1.5 text-cyan-400 font-bold uppercase text-[10px]">
+              <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+              <span>Your Real-Time Device Location</span>
+            </div>
+            <div class="font-bold text-white text-xs">${loc.locality || 'Nagpur'}</div>
+            <p class="text-zinc-300 text-[10px]">${loc.fullAddress || 'Live GPS Locked'}</p>
+            <div class="text-zinc-400 text-[10px] pt-1 border-t border-white/10">
+              ${loc.latitude.toFixed(4)}, ${loc.longitude.toFixed(4)} (±${loc.accuracy}m)
+            </div>
+          </div>
+        `);
+
+        userLocationMarkerRef.current = userMarker;
+
+        // Fly to user's real location if not already spotlighting another point
+        if (!spotlightPoint) {
+          mapInstanceRef.current.flyTo([loc.latitude, loc.longitude], 13, { duration: 1.2 });
+        }
+      }
+    });
+
+    // Default coordinates: if user cached location exists use it, otherwise check points or Nagpur (21.1458, 79.0720)
+    const cached = getCachedDeviceLocation();
+    const initialLat = cached?.latitude || points[0]?.latitude || 21.1458;
+    const initialLng = cached?.longitude || points[0]?.longitude || 79.0720;
 
     const map = L.map(mapContainerRef.current, {
       center: [initialLat, initialLng],
@@ -53,6 +110,7 @@ export default function LeafletMapView({
     return () => {
       clearTimeout(resizeTimer);
       if (spotlightMarkerRef.current) spotlightMarkerRef.current.remove();
+      if (userLocationMarkerRef.current) userLocationMarkerRef.current.remove();
       map.remove();
       mapInstanceRef.current = null;
     };
@@ -248,6 +306,24 @@ export default function LeafletMapView({
               Infra Gap Index
             </button>
           </div>
+
+          {userLocation?.latitude && (
+            <button
+              onClick={() => {
+                if (mapInstanceRef.current && userLocation) {
+                  mapInstanceRef.current.flyTo([userLocation.latitude, userLocation.longitude], 14, { duration: 1.2 });
+                  if (userLocationMarkerRef.current) {
+                    userLocationMarkerRef.current.openPopup();
+                  }
+                }
+              }}
+              title="Fly to My Real Live Location"
+              className="glass-pill px-3 py-1.5 rounded-full text-cyan-300 hover:text-white flex items-center gap-1.5 text-xs font-mono transition-all cursor-pointer hover:border-cyan-400/50"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+              <span>Real Location ({userLocation.city || 'Nagpur'})</span>
+            </button>
+          )}
 
           <button
             onClick={handleRecenter}

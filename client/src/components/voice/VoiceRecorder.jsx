@@ -4,40 +4,41 @@ import Button from '../ui/Button';
 import Badge from '../ui/Badge';
 import TranscriptPreview from './TranscriptPreview';
 import { MicIcon, PulseIcon, SendIcon, AlertIcon, MapPinIcon } from '../icons';
+import { getLiveDeviceLocation, getCachedDeviceLocation } from '../../lib/geoService';
 
-// 4 Pre-Tested Demo Scenarios for Instant Stage Rehearsals & Fail-Safe Demo Mode
+// 4 Pre-Tested Demo Scenarios for Instant Stage Rehearsals & Fail-Safe Demo Mode (Nagpur NMC Zones)
 const DEMO_SCENARIOS = [
   {
     id: 'demo-hindi-water',
-    title: 'Hindi: Water Pipe Burst',
+    title: 'Hindi: Dharampeth Pipeline Burst',
     lang: 'HI',
-    text: 'Hamare chawl me 90 feet road par main paani pipe phat gaya hai, 3 din se peene ka paani nahi aa raha.',
-    region: 'Ward 12 - Dharavi / Shahu Nagar',
-    coords: { latitude: 19.0402, longitude: 72.8508 },
+    text: 'Dharampeth main road par 100mm drinking water feeder line burst ho gayi hai, do din se pure area me paani nahi aa raha.',
+    region: 'Zone 2 - Dharampeth / Civil Lines (Nagpur)',
+    coords: { latitude: 21.1458, longitude: 79.0720 },
   },
   {
     id: 'demo-marathi-road',
-    title: 'Marathi: Sinkhole Hazard',
+    title: 'Marathi: Sitabuldi Crater & Pothole',
     lang: 'MR',
-    text: 'Kurla station jawal motha khadda padla ahe, ambulance adakli hoti kal ratri.',
-    region: 'Ward 9 - Kurla West / LBS Marg',
-    coords: { latitude: 19.0688, longitude: 72.8797 },
+    text: 'Sitabuldi main market jawal mothe khadde padlet ani traffic jam zhalay, ambulance fasli ahe.',
+    region: 'Zone 4 - Dhantoli / Sitabuldi (Nagpur)',
+    coords: { latitude: 21.1420, longitude: 79.0850 },
   },
   {
     id: 'demo-en-electricity',
-    title: 'English: Sparking Transformer',
+    title: 'English: Medical Square Transformer',
     lang: 'EN',
-    text: 'High voltage transformer spark and oil leakage outside school gate on Hill Road.',
-    region: 'Ward 4 - Bandra West / Hill Road',
-    coords: { latitude: 19.0596, longitude: 72.8295 },
+    text: 'High voltage transformer spark and oil leakage outside Medical Square on Hanuman Nagar road.',
+    region: 'Zone 3 - Hanuman Nagar / Medical Square (Nagpur)',
+    coords: { latitude: 21.1180, longitude: 79.0950 },
   },
   {
     id: 'demo-en-it',
-    title: 'IT Corridor: Open Trench',
+    title: 'MIHAN Logistics: Drainage Overflow',
     lang: 'EN',
-    text: 'Underground fiber trench left open on Hinjewadi Phase 2 main road causing traffic chaos.',
-    region: 'Ward 22 - Hinjewadi IT Corridor',
-    coords: { latitude: 18.5913, longitude: 73.7389 },
+    text: 'Underground sewer line overflow on MIHAN approach flyover causing waterlogging near airport.',
+    region: 'MIHAN / Butibori Industrial Zone (Nagpur)',
+    coords: { latitude: 21.0350, longitude: 79.0250 },
   },
 ];
 
@@ -51,15 +52,15 @@ export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap, regio
   const [selectedDemo, setSelectedDemo] = useState(null);
   const [liveTranscript, setLiveTranscript] = useState('');
   const [selectedLang, setSelectedLang] = useState('hi-IN'); // Default to Hindi/Hinglish
-  const [manualWard, setManualWard] = useState('');
+  const [manualWard, setManualWard] = useState('Zone 2 - Dharampeth / Civil Lines (Nagpur)');
 
-  // Real-Time Device GPS State
+  // Real-Time Device GPS State - Defaults to user's real location in Nagpur
   const [gpsStatus, setGpsStatus] = useState({
     status: 'locating',
-    coords: null,
-    accuracy: null,
-    wardName: null,
-    text: 'Acquiring real-time device GPS coordinates...',
+    coords: { latitude: 21.1458, longitude: 79.0720 },
+    accuracy: 10,
+    wardName: 'Zone 2 - Dharampeth / Civil Lines (Nagpur)',
+    text: 'Acquiring real-time device GPS coordinates (Nagpur)...',
   });
 
   const mediaRecorderRef = useRef(null);
@@ -68,64 +69,53 @@ export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap, regio
   const recognitionRef = useRef(null);
   const transcriptAccumulatorRef = useRef('');
 
-  // Acquire real-time device GPS location
-  const detectDeviceLocation = () => {
-    if (!navigator.geolocation) {
-      setGpsStatus({
-        status: 'unsupported',
-        coords: null,
-        wardName: regions[0]?.region_name || 'Ward 12 - Dharavi / Shahu Nagar',
-        text: 'GPS geolocation unsupported on this device',
-      });
-      return;
-    }
-
+  // Acquire real-time device GPS location and reverse-geocode to real locality
+  const detectDeviceLocation = async () => {
     setGpsStatus(prev => ({
       ...prev,
       status: 'locating',
       text: 'Acquiring real-time device GPS coordinates...',
     }));
 
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude, accuracy } = pos.coords;
-        const safeRegions = Array.isArray(regions) && regions.length > 0 ? regions : [];
-        let nearest = safeRegions[0];
-        let minDistance = Infinity;
+    try {
+      const loc = await getLiveDeviceLocation();
+      const { latitude, longitude, accuracy, locality, city } = loc;
+      const safeRegions = Array.isArray(regions) && regions.length > 0 ? regions : [];
 
-        safeRegions.forEach((reg) => {
-          if (reg.latitude && reg.longitude) {
-            const dLat = Number(reg.latitude) - latitude;
-            const dLng = Number(reg.longitude) - longitude;
-            const dist = Math.sqrt(dLat * dLat + dLng * dLng);
-            if (dist < minDistance) {
-              minDistance = dist;
-              nearest = reg;
-            }
+      let nearest = safeRegions[0];
+      let minDistance = Infinity;
+
+      safeRegions.forEach((reg) => {
+        if (reg.latitude && reg.longitude) {
+          const dLat = Number(reg.latitude) - latitude;
+          const dLng = Number(reg.longitude) - longitude;
+          const dist = Math.sqrt(dLat * dLat + dLng * dLng);
+          if (dist < minDistance) {
+            minDistance = dist;
+            nearest = reg;
           }
-        });
+        }
+      });
 
-        const detectedWardName = nearest ? nearest.region_name : 'Detected Device Location';
+      const isNagpurRegion = latitude >= 20.8 && latitude <= 21.5 && longitude >= 78.5 && longitude <= 79.5;
+      let targetName = locality;
+      if (nearest && (minDistance < 0.2 || (isNagpurRegion && nearest.region_name.includes('Nagpur')))) {
+        targetName = nearest.region_name;
+      }
+      if (!targetName) targetName = `${city || 'Nagpur'} (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`;
 
-        setGpsStatus({
-          status: 'locked',
-          coords: { latitude, longitude },
-          accuracy: Math.round(accuracy),
-          wardName: detectedWardName,
-          text: `GPS Locked: ${latitude.toFixed(4)}, ${longitude.toFixed(4)} (±${Math.round(accuracy)}m • ${detectedWardName})`,
-        });
-      },
-      (err) => {
-        console.warn('[VoiceRecorder GPS Notice]', err.message);
-        setGpsStatus({
-          status: 'denied',
-          coords: null,
-          wardName: regions[0]?.region_name || 'Ward 12 - Dharavi / Shahu Nagar',
-          text: 'Location permission disabled. Click to retry or choose ward below.',
-        });
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
-    );
+      setGpsStatus({
+        status: 'locked',
+        coords: { latitude, longitude },
+        accuracy,
+        wardName: targetName,
+        text: `Real GPS: ${targetName} (${latitude.toFixed(4)}, ${longitude.toFixed(4)} • ±${accuracy}m)`,
+      });
+      setManualWard(targetName);
+      return;
+    } catch (e) {
+      console.warn('[VoiceRecorder] Location detection notice:', e.message);
+    }
   };
 
   // Auto-detect GPS on component mount
@@ -285,9 +275,9 @@ export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap, regio
       const isWater = spokenText?.toLowerCase().includes('water') || spokenText?.toLowerCase().includes('paani') || spokenText?.toLowerCase().includes('pipe');
       const isPower = spokenText?.toLowerCase().includes('spark') || spokenText?.toLowerCase().includes('transformer') || spokenText?.toLowerCase().includes('light') || spokenText?.toLowerCase().includes('bijli');
 
-      const resolvedText = spokenText || 'Main pipeline burst near 90 Feet Road Dharavi, clean drinking water flowing into open drain for 3 days now.';
-      const activeCoords = overrideLocation?.coords || gpsStatus.coords || { latitude: 19.0402, longitude: 72.8508 };
-      const activeWard = manualWard || overrideLocation?.wardName || gpsStatus.wardName || 'Ward 12 - Dharavi / Shahu Nagar';
+      const resolvedText = spokenText || 'Dharampeth main road par 100mm drinking water feeder line burst ho gayi hai, do din se pure area me paani nahi aa raha.';
+      const activeCoords = overrideLocation?.coords || gpsStatus.coords || { latitude: 21.1458, longitude: 79.0720 };
+      const activeWard = manualWard || overrideLocation?.wardName || gpsStatus.wardName || 'Zone 2 - Dharampeth / Civil Lines (Nagpur)';
 
       const fallbackResult = {
         success: true,
@@ -403,6 +393,34 @@ export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap, regio
             >
               ↻ Recalibrate GPS
             </button>
+          </div>
+
+          {/* Real Locality / Ward Selection */}
+          <div className="relative z-10 flex flex-wrap items-center justify-center gap-2 mb-4">
+            <span className="text-[10px] font-mono uppercase text-zinc-400">Target Locality / Ward:</span>
+            <select
+              value={manualWard || gpsStatus.wardName || 'Zone 2 - Dharampeth / Civil Lines (Nagpur)'}
+              onChange={(e) => {
+                const selectedVal = e.target.value;
+                setManualWard(selectedVal);
+                const matched = (regions || []).find(r => r.region_name === selectedVal);
+                if (matched) {
+                  setGpsStatus(prev => ({
+                    ...prev,
+                    wardName: matched.region_name,
+                    coords: { latitude: Number(matched.latitude), longitude: Number(matched.longitude) },
+                    text: `Selected Ward: ${matched.region_name}`,
+                  }));
+                }
+              }}
+              className="bg-zinc-900/90 text-white text-xs font-mono border border-white/20 rounded-lg px-3 py-1.5 focus:outline-none focus:border-cyan-400 cursor-pointer"
+            >
+              {(regions || []).map((r) => (
+                <option key={r.id || r.region_name} value={r.region_name} className="bg-zinc-950 text-white">
+                  {r.region_name}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* Language Selector for Live STT */}

@@ -247,7 +247,18 @@ export function heuristicClassifyComplaint(text) {
 
   // 2. Region / Ward Name Extraction
   const wardKeywords = [
-    { name: 'Ward 12 - Dharavi / Shahu Nagar', match: /dharavi|shahu nagar|90 feet/i },
+    // Nagpur Municipal Corporation (NMC) Zones
+    { name: 'Zone 2 - Dharampeth / Civil Lines (Nagpur)', match: /dharampeth|civil lines|nagpur|shankar nagar/i },
+    { name: 'Zone 4 - Dhantoli / Sitabuldi (Nagpur)', match: /dhantoli|sitabuldi|burdi|wardha road/i },
+    { name: 'Zone 1 - Laxmi Nagar / Bajaj Nagar (Nagpur)', match: /laxmi nagar|bajaj nagar|deekshabhoomi/i },
+    { name: 'Zone 3 - Hanuman Nagar / Medical Square (Nagpur)', match: /hanuman nagar|medical square|medical college/i },
+    { name: 'Zone 6 - Gandhibagh / Itwari / Old City (Nagpur)', match: /gandhibagh|itwari|mahal|old city/i },
+    { name: 'Zone 10 - Mangalwari / Sadar (Nagpur)', match: /mangalwari|sadar|katol road/i },
+    { name: 'Zone 9 - Ashi Nagar / Jaripatka (Nagpur)', match: /ashi nagar|jaripatka|kamptee/i },
+    { name: 'MIHAN / Butibori Industrial Zone (Nagpur)', match: /mihan|butibori|hingna/i },
+
+    // Mumbai & Regional Wards
+    { name: 'Ward 12 - Dharavi / Shahu Nagar', match: /dharavi|shahu nagar|90 feet road dharavi/i },
     { name: 'Ward 9 - Kurla West / LBS Marg', match: /kurla|lbs marg|kurla station/i },
     { name: 'Ward 15 - Chembur North / Govandi', match: /chembur|govandi/i },
     { name: 'Ward 8 - Andheri East / MIDC Industrial', match: /andheri|midc/i },
