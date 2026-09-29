@@ -1,0 +1,25 @@
+{
+  "name": "civicpulse",
+  "version": "1.0.0",
+  "description": "CivicPulse — AI-Powered Citizen Infrastructure Prioritization Platform",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node start-all.js",
+    "start": "node start-all.js",
+    "dev:all": "node start-all.js",
+    "dev:client": "npm --prefix client run dev",
+    "dev:server": "npm --prefix server run dev",
+    "build": "npm --prefix client run build",
+    "test": "npm --prefix server test",
+    "install:all": "npm --prefix server install && npm --prefix client install"
+  },
+  "keywords": [
+    "civic-pulse",
+    "ai",
+    "prioritization",
+    "smart-city"
+  ],
+  "author": "CivicPulse Team",
+  "license": "MIT"
+}
