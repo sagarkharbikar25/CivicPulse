@@ -12,6 +12,7 @@ export default function StatPill({
     <div
       className={`group relative overflow-hidden rounded-2xl bg-[#09090C] border border-white/10 p-4 flex items-center gap-4 transition-all duration-200 hover:border-white/20 hover:bg-[#0D0D12] shadow-2xl ${className}`}
     >
+      <div className="animated-border-beam" />
       {Icon && (
         <div className="w-11 h-11 rounded-full bg-white/[0.04] border border-white/10 flex items-center justify-center text-white/90 shrink-0 transition-all duration-200 group-hover:bg-white/[0.08] group-hover:border-white/25 group-hover:text-white shadow-sm">
           <Icon className="w-5 h-5" />

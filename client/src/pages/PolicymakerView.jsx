@@ -2,6 +2,25 @@ import React, { useState } from 'react';
 import { Card, Badge } from '../components/ui';
 import { PulseIcon, RefreshIcon } from '../components/icons';
 
+function isLegacyDummy(name) {
+  if (!name) return false;
+  const s = String(name).toLowerCase();
+  return (
+    s.includes('dharavi') ||
+    s.includes('kurla') ||
+    s.includes('shahu nagar') ||
+    s.includes('mankhurd') ||
+    s.includes('bandra') ||
+    s.includes('chembur') ||
+    s.includes('andheri') ||
+    s.includes('colaba') ||
+    s.includes('hinjewadi') ||
+    s.includes('kothrud') ||
+    s.includes('whitefield') ||
+    s.includes('charminar')
+  );
+}
+
 export default function PolicymakerView({ priorities = [], onRecompute, isRecomputing }) {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [sortBy, setSortBy] = useState('rank');
@@ -14,7 +33,9 @@ export default function PolicymakerView({ priorities = [], onRecompute, isRecomp
     { id: 'sanitation', label: 'Sanitation' },
   ];
 
-  const safePriorities = Array.isArray(priorities) ? priorities : [];
+  const safePriorities = (Array.isArray(priorities) ? priorities : []).filter(
+    p => !isLegacyDummy(p.region_name)
+  );
   let displayedPriorities = [...safePriorities];
   if (selectedCategory !== 'all') {
     displayedPriorities = displayedPriorities.filter(
@@ -81,7 +102,8 @@ export default function PolicymakerView({ priorities = [], onRecompute, isRecomp
       </div>
 
       {/* Controls Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-[#0A0A0E] p-2.5 rounded-2xl border border-white/10">
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-[#0A0A0E] p-2.5 rounded-2xl border border-white/10 relative overflow-hidden">
+        <div className="animated-border-beam" />
         <div className="flex items-center gap-1.5 overflow-x-auto">
           {categories.map((cat) => (
             <button
@@ -115,7 +137,8 @@ export default function PolicymakerView({ priorities = [], onRecompute, isRecomp
       </div>
 
       {/* Priority Table */}
-      <div className="rounded-2xl bg-[#09090C] border border-white/10 overflow-hidden shadow-2xl">
+      <div className="rounded-2xl bg-[#09090C] border border-white/10 overflow-hidden shadow-2xl relative">
+        <div className="animated-border-beam" />
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs text-slate-300">
             <thead className="bg-[#101016] border-b border-white/[0.08] text-[11px] uppercase tracking-wider text-slate-400 font-mono">
@@ -129,8 +152,23 @@ export default function PolicymakerView({ priorities = [], onRecompute, isRecomp
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
-              {displayedPriorities.map((item) => (
-                <tr key={item.id} className="hover:bg-white/[0.02] transition-colors">
+              {displayedPriorities.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-12 text-center text-slate-400">
+                    <div className="flex flex-col items-center justify-center space-y-2">
+                      <PulseIcon className="w-8 h-8 text-slate-600 animate-pulse" />
+                      <p className="font-mono text-xs text-slate-400">
+                        No active capital priority projects found for the selected sector.
+                      </p>
+                      <p className="text-[11px] text-slate-500 font-light">
+                        Citizen complaints submitted via Voice or Text dynamically populate and rank this queue.
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                displayedPriorities.map((item) => (
+                  <tr key={item.id} className="hover:bg-white/[0.02] transition-colors">
                   <td className="py-4 px-5 text-center">
                     <span
                       className={`
@@ -191,7 +229,8 @@ export default function PolicymakerView({ priorities = [], onRecompute, isRecomp
                     </div>
                   </td>
                 </tr>
-              ))}
+              ))
+            )}
             </tbody>
           </table>
         </div>

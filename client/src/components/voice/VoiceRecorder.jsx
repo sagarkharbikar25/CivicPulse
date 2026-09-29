@@ -469,7 +469,8 @@ export default function VoiceRecorder({ onSubmissionComplete, onViewOnMap, regio
 
             {/* Live Real-Time Speech Stream Box */}
             {isRecording && (
-              <div className="mt-4 max-w-md w-full p-3 rounded-xl bg-black/60 border border-red-500/30 text-left animate-fade-in">
+              <div className="mt-4 max-w-md w-full p-3 rounded-xl bg-black/60 border border-red-500/30 text-left animate-fade-in relative overflow-hidden">
+                <div className="animated-border-beam" />
                 <div className="flex items-center gap-2 mb-1">
                   <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
                   <span className="text-[10px] font-mono uppercase text-red-400 font-bold">

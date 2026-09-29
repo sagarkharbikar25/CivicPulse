@@ -1,22 +1,31 @@
 import { Router } from 'express';
-import { getPriorityProjects, getSubmissions, getRegions } from '../db/supabaseAdmin.js';
-import { recomputePriorityProjects } from '../services/scoringEngine.js';
+import { getPriorityProjects, getSubmissions, getRegions, syncPriorityProjects, isLegacyDummy } from '../db/supabaseAdmin.js';
+import { recomputePriorityProjects, coerceNumber, clamp } from '../services/scoringEngine.js';
+import { wardNameMatches } from '../utils/geo.js';
 
 const router = Router();
 
 /**
  * GET /api/priority
- * Returns ranked priority projects list with urgency, submission counts, and actions.
+ * Dynamically computes ranked priority projects list from live submissions and regions.
  */
 router.get('/', async (req, res, next) => {
   try {
-    let projects = await getPriorityProjects();
+    const [rawSubs, rawRegions] = await Promise.all([
+      getSubmissions({ limit: 500 }),
+      getRegions(),
+    ]);
 
-    // If projects empty, calculate on the fly
+    const submissions = (rawSubs || []).filter(s => !isLegacyDummy(s.region_name));
+    const regions = (rawRegions || []).filter(r => !isLegacyDummy(r.region_name));
+
+    // Dynamic prioritization calculation from live database records
+    let projects = recomputePriorityProjects(submissions, regions);
+
     if (!projects || projects.length === 0) {
-      const submissions = await getSubmissions({ limit: 500 });
-      const regions = await getRegions();
-      projects = recomputePriorityProjects(submissions, regions);
+      projects = await getPriorityProjects();
+    } else {
+      syncPriorityProjects(projects).catch(e => console.warn('[Priority] Background sync:', e.message));
     }
 
     res.json({
@@ -36,28 +45,28 @@ router.get('/', async (req, res, next) => {
  */
 router.get('/heatmap', async (req, res, next) => {
   try {
-    const [regions, submissions] = await Promise.all([
+    const [rawRegions, rawSubs] = await Promise.all([
       getRegions(),
       getSubmissions({ limit: 500 }),
     ]);
 
+    const regions = (rawRegions || []).filter(r => !isLegacyDummy(r.region_name));
+    const submissions = (rawSubs || []).filter(s => !isLegacyDummy(s.region_name));
+
     // Aggregate real database submissions per authentic ward
     const wardNodes = (regions || []).map((region) => {
-      const wardSubs = (submissions || []).filter((s) => {
-        const subRegion = (s.region_name || '').toLowerCase();
-        const wardName = (region.region_name || '').toLowerCase();
-        return subRegion.includes(wardName) || wardName.includes(subRegion);
-      });
+      const wardSubs = (submissions || []).filter((s) => wardNameMatches(s.region_name, region.region_name));
 
       const count = wardSubs.length;
       const avgSubUrgency = count > 0
-        ? wardSubs.reduce((acc, curr) => acc + (Number(curr.urgency_score) || 75), 0) / count
+        ? wardSubs.reduce((acc, curr) => acc + coerceNumber(curr.urgency_score, 75), 0) / count
         : null;
+      const gapScore = coerceNumber(region.infra_gap_score, 70);
 
       // Composite intensity: weighted blend of active complaint urgency and infrastructural gap
       const intensity = avgSubUrgency !== null
-        ? Math.min(100, Math.round(avgSubUrgency * 0.65 + (Number(region.infra_gap_score) || 70) * 0.35))
-        : Math.min(100, Math.round(Number(region.infra_gap_score) || 70));
+        ? Math.round(clamp(avgSubUrgency * 0.65 + gapScore * 0.35, 0, 100))
+        : Math.round(clamp(gapScore, 0, 100));
 
       return {
         id: region.id,
@@ -67,8 +76,8 @@ router.get('/heatmap', async (req, res, next) => {
         longitude: Number(region.longitude),
         intensity: intensity,
         submissionsCount: count,
-        population: Number(region.population) || 450000,
-        gapScore: Math.round(Number(region.infra_gap_score) || 70),
+        population: coerceNumber(region.population, 450000),
+        gapScore: Math.round(gapScore),
         recentSubmissions: wardSubs.slice(0, 3).map(s => ({
           id: s.id,
           category: s.category,
@@ -80,24 +89,26 @@ router.get('/heatmap', async (req, res, next) => {
     });
 
     // Individual GeoJSON features for hot-spot radar pins
-    const features = (submissions || []).map((sub) => ({
-      type: 'Feature',
-      geometry: {
-        type: 'Point',
-        coordinates: [Number(sub.longitude) || 0, Number(sub.latitude) || 0],
-      },
-      properties: {
-        id: sub.id,
-        category: sub.category,
-        region_name: sub.region_name,
-        urgency_score: Number(sub.urgency_score) || 75,
-        weight: Number(((Number(sub.urgency_score) || 50) / 100).toFixed(2)),
-        status: sub.status,
-        created_at: sub.created_at,
-        raw_text: sub.raw_text,
-      },
-    }));
-
+    const features = (submissions || []).map((sub) => {
+      const urgency = coerceNumber(sub.urgency_score, 75);
+      return {
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [coerceNumber(sub.longitude, 0), coerceNumber(sub.latitude, 0)],
+        },
+        properties: {
+          id: sub.id,
+          category: sub.category,
+          region_name: sub.region_name,
+          urgency_score: urgency,
+          weight: Number((clamp(urgency, 0, 100) / 100).toFixed(2)),
+          status: sub.status,
+          created_at: sub.created_at,
+          raw_text: sub.raw_text,
+        },
+      };
+    });
     res.json({
       type: 'FeatureCollection',
       success: true,
@@ -108,7 +119,7 @@ router.get('/heatmap', async (req, res, next) => {
         total_wards: wardNodes.length,
         total_submissions: submissions.length,
         avg_city_urgency: submissions.length > 0
-          ? Number((submissions.reduce((a, b) => a + (Number(b.urgency_score) || 75), 0) / submissions.length).toFixed(1))
+          ? Number((submissions.reduce((a, b) => a + coerceNumber(b.urgency_score, 75), 0) / submissions.length).toFixed(1))
           : 78.4,
       },
     });

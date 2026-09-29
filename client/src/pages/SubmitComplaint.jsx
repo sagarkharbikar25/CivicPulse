@@ -15,6 +15,7 @@ export default function SubmitComplaint({ regions = [], onComplaintSubmitted, on
   const [submittedResult, setSubmittedResult] = useState(null);
   const [isLocating, setIsLocating] = useState(false);
   const [geoStatus, setGeoStatus] = useState(null);
+  const [notPersisted, setNotPersisted] = useState(false);
   const [realCoords, setRealCoords] = useState({ latitude: 21.2113, longitude: 79.0643, accuracy: 100 });
 
   const categories = [
@@ -58,6 +59,7 @@ export default function SubmitComplaint({ regions = [], onComplaintSubmitted, on
     setSeverity(preset.severity);
     setRegionName(preset.region);
     setSubmittedResult(null);
+    setNotPersisted(false);
   };
 
   const handleDetectLocation = async () => {
@@ -118,6 +120,7 @@ export default function SubmitComplaint({ regions = [], onComplaintSubmitted, on
         const sub = res.submission || res.data;
         setSubmittedResult(sub);
         if (onComplaintSubmitted) onComplaintSubmitted(sub);
+        if (res.localOnly) setNotPersisted(true);
       }
     } catch (err) {
       console.error('Submission failed', err);
@@ -193,7 +196,7 @@ export default function SubmitComplaint({ regions = [], onComplaintSubmitted, on
         <>
           {/* Demo Quick-Presets */}
           <div className="rounded-2xl bg-[#09090C] border border-white/10 p-5 shadow-2xl relative overflow-hidden">
-            <div className="light-slit absolute top-0 inset-x-0" />
+            <div className="animated-border-beam" />
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider font-mono">
                 Demo Presets (Instant Multilingual Test Cases)
@@ -228,7 +231,6 @@ export default function SubmitComplaint({ regions = [], onComplaintSubmitted, on
       {/* Main Submission Form */}
       <div className="rounded-2xl bg-[#09090C] border border-white/10 p-6 sm:p-8 shadow-2xl relative overflow-hidden">
         <div className="animated-border-beam" />
-
         {submittedResult ? (
           <div className="text-center py-8 space-y-5">
             <div className="w-16 h-16 rounded-full bg-white text-black flex items-center justify-center mx-auto shadow-glow-white">
@@ -244,7 +246,23 @@ export default function SubmitComplaint({ regions = [], onComplaintSubmitted, on
               </p>
             </div>
 
-            <div className="max-w-md mx-auto bg-[#101015] border border-white/10 rounded-2xl p-5 text-left space-y-2.5 text-xs">
+            {notPersisted && (
+              <div className="max-w-md mx-auto rounded-xl border border-amber-500/40 bg-amber-950/20 p-4 text-left">
+                <div className="flex items-start gap-2.5">
+                  <AlertIcon className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs font-semibold text-amber-300">Not saved to the municipal server</p>
+                    <p className="text-[11px] text-amber-200/70 mt-1 leading-relaxed">
+                      The API is unreachable, so this grievance exists only in your browser. It has <em>not</em> been
+                      filed with the municipality and no official response will follow. Please retry when connected.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="max-w-md mx-auto bg-[#101015] border border-white/10 rounded-2xl p-5 text-left space-y-2.5 text-xs relative overflow-hidden">
+              <div className="animated-border-beam" />
               <div className="flex justify-between items-center border-b border-white/5 pb-2">
                 <span className="text-slate-400 font-mono">Calculated Urgency:</span>
                 <Badge urgencyScore={submittedResult.urgency_score} />
@@ -269,6 +287,7 @@ export default function SubmitComplaint({ regions = [], onComplaintSubmitted, on
               <button
                 onClick={() => {
                   setSubmittedResult(null);
+                  setNotPersisted(false);
                   setText('');
                 }}
                 className="px-6 py-2.5 rounded-full bg-white text-black font-semibold text-xs hover:bg-slate-200 transition-all cursor-pointer shadow-glow-white"
@@ -308,7 +327,8 @@ export default function SubmitComplaint({ regions = [], onComplaintSubmitted, on
               </div>
 
               {/* Real-Time Location Display Card */}
-              <div className="p-4 rounded-xl bg-[#121217] border border-cyan-500/30 flex items-center justify-between gap-3">
+              <div className="p-4 rounded-xl bg-[#121217] border border-cyan-500/30 flex items-center justify-between gap-3 relative overflow-hidden">
+                <div className="animated-border-beam" />
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-lg bg-cyan-950/60 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shrink-0">
                     <MapPinIcon className="w-5 h-5 animate-pulse" />
@@ -405,7 +425,8 @@ export default function SubmitComplaint({ regions = [], onComplaintSubmitted, on
             </div>
 
             {/* Live Formula Preview */}
-            <div className="rounded-xl bg-[#121218] border border-white/10 p-4 flex items-center justify-between">
+            <div className="rounded-xl bg-[#121218] border border-white/10 p-4 flex items-center justify-between relative overflow-hidden">
+              <div className="animated-border-beam" />
               <div>
                 <span className="text-[11px] font-semibold text-white uppercase tracking-wider font-mono block">
                   Projected Algorithmic Urgency

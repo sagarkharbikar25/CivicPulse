@@ -10,7 +10,10 @@
     "test": "node test/scoringEngine.test.js",
     "test:api": "node test/api.test.js",
     "test:ai": "node test/aiPipeline.test.js",
-    "test:all": "node test/scoringEngine.test.js && node test/api.test.js && node test/aiPipeline.test.js"
+    "test:security": "node test/security.test.js",
+    "test:edge": "node test/edgeCases.test.js",
+    "test:contract": "node test/clientContract.test.js",
+    "test:all": "node test/scoringEngine.test.js && node test/api.test.js && node test/aiPipeline.test.js && node test/security.test.js && node test/edgeCases.test.js && node test/clientContract.test.js"
   },
   "keywords": [
     "civic-tech",

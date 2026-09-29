@@ -193,11 +193,29 @@ function parseJsonSafely(text) {
 }
 
 /**
+ * Builds an honest, category-accurate English gloss for non-English input when
+ * the heuristic fallback is active. This is explicitly labelled as a machine
+ * gloss rather than presented as a verbatim translation.
+ */
+function buildHeuristicGloss(category, originalText) {
+  const templates = {
+    water: 'Water supply / pipeline complaint reported (auto-detected keywords).',
+    electricity: 'Power supply / electrical hazard complaint reported (auto-detected keywords).',
+    roads: 'Road damage / traffic hazard complaint reported (auto-detected keywords).',
+    sanitation: 'Waste collection / sanitation complaint reported (auto-detected keywords).',
+    transport: 'Public transport complaint reported (auto-detected keywords).',
+    other: 'Municipal infrastructure complaint reported (auto-detected keywords).',
+  };
+  return `${templates[category] || templates.other} Original: ${originalText}`;
+}
+
+/**
  * High-precision heuristic fallback classifier.
  * Handles English, Hindi, Marathi, and Hinglish.
  */
 export function heuristicClassifyComplaint(text) {
   const lower = text.toLowerCase();
+  const cleanText = String(text).trim();
   const detectedLang = detectLanguageSimple(text);
 
   // 1. Category Keyword Matching with weighted scores
@@ -210,28 +228,28 @@ export function heuristicClassifyComplaint(text) {
   };
 
   // Sanitation cues (explicit priority for municipal waste)
-  if (/garbage|trash|compactor|waste|kachra|stench|smell|sewage line|open drain/i.test(lower)) {
+  if (/garbage|trash|compactor|waste|kachra|stench|smell|sewage|cesspool|open drain|bad smell/i.test(lower)) {
     categoryScores.sanitation += 5;
   }
-  if (/garbage spilling|missed.*days|uncollected/i.test(lower)) {
+  if (/garbage spilling|missed.*days|uncollected|not been collected|has not visited/i.test(lower)) {
     categoryScores.sanitation += 4;
   }
 
   // Water cues
-  if (/pipeline|pipe|burst|leakage|drinking water|paani|pani|contamination|dysentery/i.test(lower)) {
+  if (/pipeline|pipe|burst|leakage|drinking water|paani|pani|contamination|dysentery|water supply|zero water|tap water|supply cut/i.test(lower)) {
     categoryScores.water += 5;
   }
-  if (/chawl has zero water|no water|water flowing|paani pipe/i.test(lower)) {
+  if (/chawl has zero water|no water|water flowing|paani pipe|nahi aa raha|nahin aa raha/i.test(lower)) {
     categoryScores.water += 4;
   }
 
   // Electricity cues
-  if (/transformer|spark|electrocution|live wire|cables|power cut|outage|blackout|traffic light|traffic lights|streetlight|tripping|voltage|bijli|shock/i.test(lower)) {
+  if (/transformer|spark|electrocution|live wire|cables|power cut|outage|blackout|traffic light|traffic lights|streetlight|street light|tripping|voltage|bijli|shock|jwal|jval/i.test(lower)) {
     categoryScores.electricity += 5;
   }
 
   // Roads cues
-  if (/sinkhole|pothole|crater|collapsed|road|bridge|junction|traffic|choke point|asphalt|trenching|gutters|manhole|khadda|rasta|ambulance/i.test(lower)) {
+  if (/sinkhole|pothole|crater|khadda|collapsed|collapse|road|bridge|junction|traffic|choke point|asphalt|trenching|gutters|manhole|rasta|ambulance|padla|adakli/i.test(lower)) {
     categoryScores.roads += 4;
   }
 
@@ -258,13 +276,13 @@ export function heuristicClassifyComplaint(text) {
     { name: 'MIHAN / Butibori Industrial Zone (Nagpur)', match: /mihan|butibori|hingna/i },
 
     // Mumbai & Regional Wards
-    { name: 'Ward 12 - Dharavi / Shahu Nagar', match: /dharavi|shahu nagar|90 feet road dharavi/i },
-    { name: 'Ward 9 - Kurla West / LBS Marg', match: /kurla|lbs marg|kurla station/i },
+    { name: 'Ward 12 - Dharavi / Shahu Nagar', match: /\bdharavi\b|shahu nagar|90 feet road|\bchawl\b/i },
+    { name: 'Ward 9 - Kurla West / LBS Marg', match: /\bkurla\b|lbs marg|kurla station/i },
     { name: 'Ward 15 - Chembur North / Govandi', match: /chembur|govandi/i },
     { name: 'Ward 8 - Andheri East / MIDC Industrial', match: /andheri|midc/i },
     { name: 'Ward 7 - Shivaji Nagar / Mankhurd', match: /shivaji nagar|mankhurd|baiganwadi/i },
     { name: 'Ward 4 - Bandra West / Hill Road', match: /bandra|hill road/i },
-    { name: 'Ward 1 - Colaba / Fort Financial District', match: /colaba|fort|oval maidan/i },
+    { name: 'Ward 1 - Colaba / Fort Financial District', match: /colaba|oval maidan/i },
     { name: 'Ward 22 - Hinjewadi IT Corridor', match: /hinjewadi|phase 2/i },
     { name: 'Ward 18 - Kothrud / Karve Road', match: /kothrud|karve road/i },
     { name: 'Ward 3 - Whitefield Tech Zone', match: /whitefield/i },
@@ -297,12 +315,17 @@ export function heuristicClassifyComplaint(text) {
   }
 
   // 4. Translation & One-line Summary
-  let translatedText = text;
-  if (detectedLang === 'hi' || /paani|phat gaya|hamare/i.test(lower)) {
-    translatedText = 'Water main pipeline has burst, causing clean drinking water shortage for 3 days.';
-  } else if (detectedLang === 'mr' || /khadda|padla|adakli/i.test(lower)) {
-    translatedText = 'A large pothole has formed near the station, trapping vehicles and an emergency ambulance.';
-  }
+  //
+  // The heuristic layer cannot genuinely translate. The previous version
+  // returned a hardcoded "water main pipeline has burst" sentence for *any*
+  // text detected as Hindi, so a Marathi pothole complaint was stored with a
+  // completely unrelated water translation. We now emit an explicit,
+  // category-accurate English gloss of what the keyword pass actually detected
+  // and keep the original text, rather than inventing a confident translation.
+  const needsTranslation = detectedLang === 'hi' || detectedLang === 'mr';
+  const translatedText = needsTranslation
+    ? buildHeuristicGloss(topCategory, cleanText)
+    : text;
 
   const oneLineSummary = `${topCategory.toUpperCase()} incident reported: ${text.slice(0, 50)}...`;
 

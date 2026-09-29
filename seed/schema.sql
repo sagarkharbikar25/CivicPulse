@@ -20,7 +20,7 @@ create table if not exists submissions (
   longitude float8,
   region_name text,
   urgency_score float8,
-  status text default 'new',
+  status text default 'new',       -- new | reviewed | prioritized | needs_review
   created_at timestamptz default now()
 );
 
@@ -70,10 +70,14 @@ create policy "Public can read submissions"
   on submissions for select
   using (true);
 
+-- 'needs_review' is required by 02-ai-integration.md task 6: when the LLM call
+-- fails or times out the heuristic fallback still saves the citizen grievance
+-- flagged for human review. Excluding it here would reject exactly the rows
+-- that fallback path is supposed to preserve.
 create policy "Public can insert citizen complaints"
   on submissions for insert
   with check (
-    status in ('new', 'reviewed', 'prioritized') and
+    status in ('new', 'reviewed', 'prioritized', 'needs_review') and
     raw_input_type in ('voice', 'text', 'chat')
   );
 

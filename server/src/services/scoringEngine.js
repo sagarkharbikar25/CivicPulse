@@ -20,9 +20,33 @@ export const CATEGORY_SEVERITY_MAP = {
 };
 
 /**
+ * Coerces a value to a finite number, falling back to `fallback` only when the
+ * value is genuinely absent/unparseable.
+ *
+ * The ubiquitous `Number(x) || fallback` idiom is wrong here because 0 is
+ * falsy: a genuinely zero infra-gap score or a zero urgency was silently
+ * rewritten to the fallback (0 urgency displayed as 75/100 on the dashboard).
+ */
+export function coerceNumber(value, fallback) {
+  if (value === null || value === undefined || value === '') return fallback;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+/**
+ * NaN-safe clamp. `Math.max(0, Math.min(100, NaN)` evaluates to NaN, so a
+ * single bad input previously poisoned the entire urgency score.
+ */
+export function clamp(value, min, max) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return min;
+  return Math.max(min, Math.min(max, n));
+}
+
+/**
  * Calculates exponential recency decay from hours elapsed
  * Recent reports (0 hrs) = 100
- * Decay rate ~50% drop every 48 hours
+ * Decay constant is 48h: 100 -> ~61 at 24h -> ~37 at 48h, floored at 10.
  * 
  * @param {number|Date|string} createdAt - timestamp or hours elapsed
  * @param {Date} [referenceTime=new Date()]
@@ -31,16 +55,19 @@ export const CATEGORY_SEVERITY_MAP = {
 export function calculateRecencyDecay(createdAt, referenceTime = new Date()) {
   let hoursElapsed = 0;
   if (typeof createdAt === 'number') {
-    hoursElapsed = Math.max(0, createdAt);
+    hoursElapsed = Number.isFinite(createdAt) ? Math.max(0, createdAt) : 0;
   } else {
     const createdDate = new Date(createdAt);
     const refDate = new Date(referenceTime);
-    hoursElapsed = Math.max(0, (refDate.getTime() - createdDate.getTime()) / (1000 * 60 * 60));
+    // An unparseable timestamp previously produced NaN hours, which propagated
+    // all the way through to a NaN urgency score.
+    const deltaMs = refDate.getTime() - createdDate.getTime();
+    hoursElapsed = Number.isFinite(deltaMs) ? Math.max(0, deltaMs / (1000 * 60 * 60)) : 0;
   }
 
-  // 100 at 0h, ~60 at 24h, ~36 at 48h, min floor 10
+  // 100 at 0h, ~61 at 24h, ~37 at 48h, min floor 10
   const decay = 100 * Math.exp(-hoursElapsed / 48);
-  return Number(Math.max(10, Math.min(100, decay)).toFixed(1));
+  return Number(clamp(decay, 10, 100).toFixed(1));
 }
 
 /**
@@ -50,10 +77,10 @@ export function calculateRecencyDecay(createdAt, referenceTime = new Date()) {
  * @returns {number} score between 0 and 100
  */
 export function calculateDensityScore(count = 1) {
-  const safeCount = Math.max(1, count);
+  const safeCount = Math.max(1, coerceNumber(count, 1));
   // Logarithmic scaling: 1 complaint = 15, 5 complaints = 50, 10 complaints = 80, 15+ = 100
   const density = 15 + (Math.log2(safeCount) * 22);
-  return Number(Math.max(15, Math.min(100, density)).toFixed(1));
+  return Number(clamp(density, 15, 100).toFixed(1));
 }
 
 /**
@@ -69,36 +96,38 @@ export function calculateDensityScore(count = 1) {
  * @param {number} [params.clusterCount] - used if densityScore not provided
  * @returns {number} urgency_score clamped between 0 and 100, rounded to 1 decimal
  */
-export function computeUrgencyScore({
-  complaintSeverityWeight,
-  category = 'other',
-  infraGapScore = 50,
-  recencyDecay,
-  createdAt,
-  densityScore,
-  clusterCount = 1,
-}) {
+export function computeUrgencyScore(params = {}) {
+  const {
+    complaintSeverityWeight,
+    category = 'other',
+    infraGapScore,
+    recencyDecay,
+    createdAt,
+    densityScore,
+    clusterCount = 1,
+  } = params || {};
+
   // 1. Resolve severity weight
   const severity = typeof complaintSeverityWeight === 'number'
-    ? Math.max(0, Math.min(100, complaintSeverityWeight))
-    : (CATEGORY_SEVERITY_MAP[category.toLowerCase()] || CATEGORY_SEVERITY_MAP.other);
+    ? clamp(complaintSeverityWeight, 0, 100)
+    : (CATEGORY_SEVERITY_MAP[String(category).toLowerCase()] || CATEGORY_SEVERITY_MAP.other);
 
-  // 2. Resolve infra gap score (0-100)
-  const infraGap = Math.max(0, Math.min(100, Number(infraGapScore) || 50));
+  // 2. Resolve infra gap score (0-100). 0 is a valid value, not "missing".
+  const infraGap = clamp(coerceNumber(infraGapScore, 50), 0, 100);
 
   // 3. Resolve recency decay (0-100)
   let recency = recencyDecay;
-  if (typeof recency !== 'number') {
+  if (typeof recency !== 'number' || !Number.isFinite(recency)) {
     recency = createdAt ? calculateRecencyDecay(createdAt) : 100;
   }
-  recency = Math.max(0, Math.min(100, recency));
+  recency = clamp(recency, 0, 100);
 
   // 4. Resolve submission density (0-100)
   let density = densityScore;
-  if (typeof density !== 'number') {
+  if (typeof density !== 'number' || !Number.isFinite(density)) {
     density = calculateDensityScore(clusterCount);
   }
-  density = Math.max(0, Math.min(100, density));
+  density = clamp(density, 0, 100);
 
   // Exact formula specified in 01-core-backend.md
   // urgency_score = (complaint_severity_weight * 0.4)
@@ -110,7 +139,7 @@ export function computeUrgencyScore({
                 (recency * 0.15) +
                 (density * 0.10);
 
-  return Number(Math.max(0, Math.min(100, score)).toFixed(1));
+  return Number(clamp(score, 0, 100).toFixed(1));
 }
 
 /**
@@ -123,12 +152,12 @@ export function computeUrgencyScore({
  * @returns {Array<Object>} ranked priority projects
  */
 export function recomputePriorityProjects(submissions = [], regions = []) {
-  if (!submissions || submissions.length === 0) return [];
+  if (!Array.isArray(submissions) || submissions.length === 0) return [];
 
   // Index regions for quick lookup
   const regionMap = new Map();
-  regions.forEach(reg => {
-    if (reg.region_name) {
+  (Array.isArray(regions) ? regions : []).forEach(reg => {
+    if (reg && reg.region_name) {
       regionMap.set(reg.region_name.toLowerCase(), reg);
     }
   });
@@ -152,7 +181,7 @@ export function recomputePriorityProjects(submissions = [], regions = []) {
 
     const cluster = clusters.get(key);
     cluster.submissions.push(sub);
-    cluster.totalUrgency += (Number(sub.urgency_score) || 50);
+    cluster.totalUrgency += coerceNumber(sub.urgency_score, 50);
   });
 
   // Action templates by category
@@ -171,7 +200,7 @@ export function recomputePriorityProjects(submissions = [], regions = []) {
     const count = cluster.submissions.length;
     const avgUrgency = Number((cluster.totalUrgency / count).toFixed(1));
     const matchingRegion = regionMap.get(cluster.region_name.toLowerCase()) || {};
-    const infraGap = Number(matchingRegion.infra_gap_score) || 50;
+    const infraGap = coerceNumber(matchingRegion.infra_gap_score, 50);
 
     // Composite ranking metric: High urgency + volume multiplier + infra disparity boost
     const volumeMultiplier = 1 + (Math.log2(count) * 0.25);
@@ -186,8 +215,8 @@ export function recomputePriorityProjects(submissions = [], regions = []) {
       avg_urgency: avgUrgency,
       compositeScore: Number(compositeScore.toFixed(2)),
       recommended_action: `${action} (Impact area: ${cluster.region_name})`,
-      latitude: cluster.submissions[0]?.latitude || matchingRegion.latitude || 19.0760,
-      longitude: cluster.submissions[0]?.longitude || matchingRegion.longitude || 72.8777,
+      latitude: coerceNumber(cluster.submissions[0]?.latitude, coerceNumber(matchingRegion.latitude, 19.0760)),
+      longitude: coerceNumber(cluster.submissions[0]?.longitude, coerceNumber(matchingRegion.longitude, 72.8777)),
       generated_at: new Date().toISOString(),
     });
   }

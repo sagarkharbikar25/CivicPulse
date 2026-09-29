@@ -6,12 +6,13 @@ export default function Card({
   glow = false,
   hoverable = false,
   highlight = false,
+  beam = true,
   ...props
 }) {
   return (
     <div
       className={`
-        relative rounded-2xl bg-[#121215]/80 backdrop-blur-xl border border-white/[0.08] p-5 shadow-card-glass transition-all duration-300
+        relative rounded-2xl bg-[#121215]/80 backdrop-blur-xl border border-white/[0.08] p-5 shadow-card-glass transition-all duration-300 overflow-hidden
         ${glow ? 'shadow-glow-cyan/20 border-cyan-500/30' : ''}
         ${hoverable ? 'hover:border-cyan-500/40 hover:bg-[#16161c]/90 hover:-translate-y-0.5' : ''}
         ${highlight ? 'before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-cyan-400 before:to-transparent' : ''}
@@ -19,6 +20,7 @@ export default function Card({
       `}
       {...props}
     >
+      {beam && <div className="animated-border-beam" />}
       {children}
     </div>
   );

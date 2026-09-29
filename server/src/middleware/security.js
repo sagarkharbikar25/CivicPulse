@@ -9,6 +9,7 @@
 
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import { timingSafeEqual } from 'node:crypto';
 
 /**
  * 1. Helmet HTTP Security Headers
@@ -37,15 +38,43 @@ export const helmetMiddleware = helmet({
 
 /**
  * 2. Multi-Tier Rate Limiters
+ *
+ * Enforcement is production-by-default. In development the limiters are skipped
+ * for loopback traffic unless RATE_LIMIT_STRICT=true, which lets the test suite
+ * actually exercise the limiter instead of only ever hitting the skip path.
  */
-// General API rate limiter (generous in dev/demo mode)
+const rateLimitStrict = () => process.env.RATE_LIMIT_STRICT === 'true';
+
+const isLoopback = (req) => {
+  const ip = req.ip || req.connection?.remoteAddress || '';
+  return ip.includes('127.0.0.1') || ip === '::1' || ip.includes('::ffff:127.0.0.1');
+};
+
+const shouldSkipRateLimit = (req) => {
+  if (rateLimitStrict()) return false;
+  if (process.env.NODE_ENV === 'production') return false;
+  return isLoopback(req);
+};
+
+/**
+ * Reads a positive integer from the environment, else falls back.
+ * Lets deployments tune the budget and lets tests exercise the limiter without
+ * issuing thousands of requests.
+ */
+function envInt(name, fallback) {
+  const parsed = Number.parseInt(process.env[name], 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+// General API rate limiter (100 requests / 15 min, per SECURITY.md).
+// `max` is resolved per request rather than captured at module load, so
+// environment changes take effect without restarting the process.
 export const generalRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: process.env.NODE_ENV === 'production' ? 100 : 10000,
-  skip: (req) => {
-    const ip = req.ip || req.connection?.remoteAddress || '';
-    return ip.includes('127.0.0.1') || ip === '::1' || ip.includes('::ffff:127.0.0.1') || process.env.NODE_ENV !== 'production';
-  },
+  max: () => (process.env.NODE_ENV === 'production'
+    ? envInt('RATE_LIMIT_MAX_GENERAL', 100)
+    : envInt('RATE_LIMIT_MAX_GENERAL', 10000)),
+  skip: shouldSkipRateLimit,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -54,14 +83,13 @@ export const generalRateLimiter = rateLimit({
   },
 });
 
-// Citizen intake rate limiter (generous in dev/demo mode)
+// Citizen intake rate limiter (20 requests / 15 min per IP, per SECURITY.md)
 export const submissionRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: process.env.NODE_ENV === 'production' ? 20 : 5000,
-  skip: (req) => {
-    const ip = req.ip || req.connection?.remoteAddress || '';
-    return ip.includes('127.0.0.1') || ip === '::1' || ip.includes('::ffff:127.0.0.1') || process.env.NODE_ENV !== 'production';
-  },
+  max: () => (process.env.NODE_ENV === 'production'
+    ? envInt('RATE_LIMIT_MAX_INTAKE', 20)
+    : envInt('RATE_LIMIT_MAX_INTAKE', 5000)),
+  skip: shouldSkipRateLimit,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -144,13 +172,36 @@ export function sanitizeCitizenInput(req, res, next) {
 /**
  * 4. Administrative Authentication Guard
  * Protects administrative actions (e.g. /api/admin/recompute)
+ *
+ * Fails CLOSED in production: previously it fell back to the hardcoded
+ * 'civicpulse-admin-dev-key', which is also committed in .env.example and was
+ * shipped verbatim to the browser bundle, leaving the admin surface effectively
+ * unauthenticated.
  */
 export function requireAdminAuth(req, res, next) {
-  const configuredAdminKey = process.env.ADMIN_API_KEY || 'civicpulse-admin-dev-key';
-  const providedKey = req.headers['x-admin-key'] || 
+  const configuredAdminKey = (process.env.ADMIN_API_KEY || '').trim();
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  if (!configuredAdminKey) {
+    console.error('[SECURITY] ADMIN_API_KEY is not set; admin routes are locked.');
+    return res.status(503).json({
+      success: false,
+      error: 'Admin access is unavailable because ADMIN_API_KEY is not configured on the server.',
+    });
+  }
+
+  if (isProduction && configuredAdminKey === 'civicpulse-admin-dev-key') {
+    console.error('[SECURITY] Refusing to serve admin routes with the well-known development key.');
+    return res.status(503).json({
+      success: false,
+      error: 'Admin access is disabled: the default development key must not be used in production.',
+    });
+  }
+
+  const providedKey = req.headers['x-admin-key'] ||
                      (req.headers.authorization && req.headers.authorization.replace('Bearer ', ''));
 
-  if (!providedKey || providedKey.trim() !== configuredAdminKey.trim()) {
+  if (!providedKey || !timingSafeEquals(providedKey.trim(), configuredAdminKey)) {
     return res.status(401).json({
       success: false,
       error: 'Unauthorized: Valid x-admin-key header or Bearer token is required to access admin endpoints.',
@@ -158,4 +209,15 @@ export function requireAdminAuth(req, res, next) {
   }
 
   next();
+}
+
+/**
+ * Constant-time string comparison to avoid leaking the admin key length/content
+ * through response timing.
+ */
+function timingSafeEquals(a, b) {
+  const bufA = Buffer.from(String(a));
+  const bufB = Buffer.from(String(b));
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
 }

@@ -68,8 +68,11 @@ export default function Dashboard({
   ];
 
   const totalGrievancesCount = safeSubmissions.length;
-  const criticalClustersCount = safePriorities.filter(p => (Number(p.avg_urgency) || 0) >= 80).length ||
-    safeHeatmapData.filter(p => (Number(p.intensity) || 0) >= 80).length;
+  // `?? null` instead of `|| 0`: a genuine count of 0 critical clusters is a
+  // real result, not a reason to fall back to a different metric.
+  const criticalFromProjects = safePriorities.filter(p => (Number(p.avg_urgency) || 0) >= 80).length;
+  const criticalFromHeatmap = safeHeatmapData.filter(p => (Number(p.intensity) || 0) >= 80).length;
+  const criticalClustersCount = safePriorities.length > 0 ? criticalFromProjects : criticalFromHeatmap;
   const meanCityUrgency = safeSubmissions.length > 0
     ? (safeSubmissions.reduce((acc, s) => acc + (Number(s.urgency_score) || 75), 0) / safeSubmissions.length).toFixed(1)
     : (safeHeatmapData.length > 0

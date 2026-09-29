@@ -6,8 +6,11 @@ import { transcribeAudio } from '../services/whisperService.js';
 import { classifyComplaint } from '../services/llmClassifyService.js';
 import { generatePolicyRecommendation } from '../services/recommendationService.js';
 import { submissionRateLimiter, sanitizeCitizenInput } from '../middleware/security.js';
+import { nearestWard, isValidCoordinatePair, wardNameMatches } from '../utils/geo.js';
 
 const router = Router();
+
+const MAX_CITIZEN_TEXT_LENGTH = 2000;
 
 // Configure Multer for memory buffer audio uploads (10MB limit)
 const upload = multer({
@@ -16,36 +19,111 @@ const upload = multer({
 });
 
 /**
- * Helper: Matches region name or GPS coordinates against registered municipal wards
+ * Helper: Matches region name or GPS coordinates against registered municipal wards.
+ *
+ * Resolution order: high-precision device GPS -> explicit region text -> LLM
+ * region guess -> first registered ward. The previous implementation crashed
+ * with a TypeError whenever the ward list was empty, and only accepted an
+ * exact full-name substring match.
  */
 function resolveWard(regionInput, regions, latitude, longitude) {
-  const nagpurDefault = (regions || []).find(r => r.region_name.includes('Nagpur')) || regions[0];
+  const wardList = Array.isArray(regions) ? regions : [];
+  if (wardList.length === 0) return null;
 
-  // 1. If high-precision device GPS coordinates are provided, find nearest ward
-  if (latitude !== undefined && longitude !== undefined && latitude !== null && longitude !== null) {
-    const lat = Number(latitude);
-    const lng = Number(longitude);
-    if (!isNaN(lat) && !isNaN(lng) && (lat !== 0 || lng !== 0)) {
-      let nearest = nagpurDefault;
-      let minDistance = Infinity;
-      for (const reg of regions) {
-        const dLat = Number(reg.latitude) - lat;
-        const dLng = Number(reg.longitude) - lng;
-        const dist = Math.sqrt(dLat * dLat + dLng * dLng);
-        if (dist < minDistance) {
-          minDistance = dist;
-          nearest = reg;
-        }
-      }
-      if (nearest) return nearest;
-    }
+  const fallbackWard = wardList.find(r => r.region_name.includes('Nagpur')) || wardList[0];
+
+  // 1. High-precision device GPS coordinates -> nearest registered ward
+  if (isValidCoordinatePair(latitude, longitude)) {
+    const nearest = nearestWard(wardList, latitude, longitude);
+    if (nearest) return nearest;
   }
 
-  // 2. Text keyword query match
-  if (!regionInput) return nagpurDefault;
-  const query = regionInput.toLowerCase().trim();
-  const matched = regions.find(r => r.region_name.toLowerCase().includes(query));
-  return matched || nagpurDefault;
+  // 2. Text keyword query match (partial, ward-list aware)
+  if (!regionInput || !String(regionInput).trim()) return fallbackWard;
+  const matched = wardList.find(r => wardNameMatches(r.region_name, regionInput));
+  return matched || fallbackWard;
+}
+
+/**
+ * Shared tail of the intake pipeline: classify -> resolve ward -> score -> persist.
+ */
+async function ingestComplaint({ rawText, inputType, body, sttResult = null }) {
+  const startTime = Date.now();
+
+  // 1. AI classification (single structured-JSON LLM call, with heuristic fallback)
+  const aiResult = await classifyComplaint(rawText);
+
+  // 2. A citizen who explicitly states the category/severity knows the ground
+  //    truth better than a classifier, so their declaration wins as a floor.
+  //    Previously both were silently discarded, so the UI's category picker and
+  //    severity slider had no effect on the stored record.
+  const declaredCategory = typeof body.category === 'string' ? body.category.trim().toLowerCase() : null;
+  const VALID_CATEGORIES = ['roads', 'water', 'electricity', 'sanitation', 'other'];
+  const category = declaredCategory && VALID_CATEGORIES.includes(declaredCategory)
+    ? declaredCategory
+    : (aiResult.category || 'other');
+
+  const declaredSeverity = Number(body.severity);
+  const llmSeverity = Number(aiResult.severity);
+  const baseSeverity = Number.isFinite(llmSeverity) ? llmSeverity : 5;
+  const severity = Number.isFinite(declaredSeverity)
+    ? Math.min(10, Math.max(baseSeverity, Math.min(10, Math.max(0, declaredSeverity))))
+    : baseSeverity;
+
+  // 3. Resolve target ward
+  const regions = await getRegions();
+  const targetWard = resolveWard(body.region_name || aiResult.region_guess, regions, body.latitude, body.longitude);
+
+  const hasGpsCoords = isValidCoordinatePair(body.latitude, body.longitude);
+  const finalLat = hasGpsCoords ? Number(body.latitude) : (Number(targetWard?.latitude) || 0);
+  const finalLng = hasGpsCoords ? Number(body.longitude) : (Number(targetWard?.longitude) || 0);
+  const finalRegionName = (body.region_name && String(body.region_name).trim().length > 0)
+    ? String(body.region_name).trim()
+    : (hasGpsCoords
+        ? `Nagpur (${finalLat.toFixed(4)}, ${finalLng.toFixed(4)})`
+        : (targetWard?.region_name || 'Unassigned Ward'));
+
+  // 4. Multi-factor urgency score (LLM/citizen severity 0-10 scaled to 0-100)
+  const severityWeight = Math.round(severity * 10);
+  const urgency = computeUrgencyScore({
+    complaintSeverityWeight: severityWeight,
+    category,
+    infraGapScore: Number(targetWard?.infra_gap_score) || 50,
+    createdAt: new Date(),
+  });
+
+  // 5. Persist
+  const newSubmission = await createSubmission({
+    raw_input_type: inputType,
+    raw_text: rawText,
+    language_detected: sttResult?.language_detected || aiResult.language_detected || 'en',
+    translated_text: aiResult.translated_text || rawText,
+    category,
+    latitude: finalLat,
+    longitude: finalLng,
+    region_name: finalRegionName,
+    urgency_score: urgency,
+    status: aiResult.status || 'new',
+  });
+
+  // 6. Re-rank priorities and generate the tailored intervention
+  const recomputeSummary = await recomputeAll();
+  const intervention = await generatePolicyRecommendation({
+    region_name: finalRegionName,
+    category,
+    submission_count: 1,
+    avg_urgency: urgency,
+  });
+
+  return {
+    newSubmission,
+    aiResult,
+    category,
+    severity,
+    recomputeSummary,
+    intervention,
+    processingMs: Date.now() - startTime,
+  };
 }
 
 /**
@@ -70,13 +148,11 @@ router.get('/', async (req, res, next) => {
 
 /**
  * POST /api/submissions/text
- * Day 2: Multilingual Text -> LLM Classify -> Urgency Scoring -> Save -> Recompute Rankings
+ * Multilingual text -> LLM classify -> urgency scoring -> save -> recompute rankings
  */
 router.post('/text', submissionRateLimiter, sanitizeCitizenInput, async (req, res, next) => {
   try {
-    const startTime = Date.now();
     const textInput = req.body.raw_text || req.body.text;
-    const { region_name, latitude, longitude, raw_input_type = 'text' } = req.body;
 
     if (!textInput || typeof textInput !== 'string' || !textInput.trim()) {
       return res.status(400).json({
@@ -85,56 +161,19 @@ router.post('/text', submissionRateLimiter, sanitizeCitizenInput, async (req, re
       });
     }
 
-    const raw_text = textInput;
+    if (textInput.length > MAX_CITIZEN_TEXT_LENGTH) {
+      return res.status(400).json({
+        success: false,
+        error: `Validation failed: raw_text exceeds maximum allowed length of ${MAX_CITIZEN_TEXT_LENGTH} characters.`,
+      });
+    }
 
-    // 1. LLM Reasoning & Classification Call
-    const aiResult = await classifyComplaint(raw_text);
+    const rawInputType = ['voice', 'text', 'chat'].includes(req.body.raw_input_type)
+      ? req.body.raw_input_type
+      : 'text';
 
-    // 2. Resolve target ward (explicit preference -> device GPS -> LLM guess -> fallback ward)
-    const regions = await getRegions();
-    const targetWard = resolveWard(region_name || aiResult.region_guess, regions, latitude, longitude);
-
-    const hasGpsCoords = latitude !== undefined && latitude !== null && !isNaN(Number(latitude)) && Number(latitude) !== 0;
-    const finalLat = hasGpsCoords ? Number(latitude) : targetWard.latitude;
-    const finalLng = hasGpsCoords ? Number(longitude) : targetWard.longitude;
-    const finalRegionName = (region_name && region_name.trim().length > 0)
-      ? region_name.trim()
-      : (hasGpsCoords ? `Nagpur (${finalLat.toFixed(4)}, ${finalLng.toFixed(4)})` : targetWard.region_name);
-
-    // 3. Compute Multi-Factor Urgency Score
-    // Severity from LLM (0-10) scaled to weight (0-100)
-    const severityWeight = Math.round(aiResult.severity * 10);
-    const urgency = computeUrgencyScore({
-      complaintSeverityWeight: severityWeight,
-      category: aiResult.category,
-      infraGapScore: targetWard.infra_gap_score || 50,
-      createdAt: new Date(),
-    });
-
-    // 4. Save to Database
-    const newSubmission = await createSubmission({
-      raw_input_type,
-      raw_text: raw_text.trim(),
-      language_detected: aiResult.language_detected || 'en',
-      translated_text: aiResult.translated_text || raw_text.trim(),
-      category: aiResult.category || 'other',
-      latitude: finalLat,
-      longitude: finalLng,
-      region_name: finalRegionName,
-      urgency_score: urgency,
-      status: aiResult.status || 'new',
-    });
-
-    // 5. Dynamic Priority Project Recomputation & Tailored Grievance Intervention
-    const recomputeSummary = await recomputeAll();
-    const submissionIntervention = await generatePolicyRecommendation({
-      region_name: finalRegionName,
-      category: aiResult.category,
-      submission_count: 1,
-      avg_urgency: urgency,
-    });
-
-    const processingMs = Date.now() - startTime;
+    const { newSubmission, aiResult, recomputeSummary, intervention, processingMs } =
+      await ingestComplaint({ rawText: textInput.trim(), inputType: rawInputType, body: req.body });
 
     res.status(201).json({
       success: true,
@@ -153,7 +192,7 @@ router.post('/text', submissionRateLimiter, sanitizeCitizenInput, async (req, re
       priority_impact: {
         total_projects: recomputeSummary?.projectsCount || 0,
         top_project: recomputeSummary?.topProject || null,
-        top_policy_action: submissionIntervention,
+        top_policy_action: intervention,
       },
     });
   } catch (err) {
@@ -163,20 +202,36 @@ router.post('/text', submissionRateLimiter, sanitizeCitizenInput, async (req, re
 
 /**
  * POST /api/submissions/voice
- * Day 2: Multipart Audio -> Whisper STT -> LLM Classify -> Urgency Scoring -> Save -> Recompute
+ * Multipart audio -> Whisper STT -> LLM classify -> urgency scoring -> save -> recompute
  */
 router.post('/voice', submissionRateLimiter, upload.single('audio'), async (req, res, next) => {
   try {
-    const startTime = Date.now();
-    const { region_name, latitude, longitude, sample_text, live_transcript, text } = req.body;
+    const { sample_text, live_transcript, text } = req.body;
     const recognizedSpeech = (live_transcript || sample_text || text || '').trim();
 
+    if (recognizedSpeech.length > MAX_CITIZEN_TEXT_LENGTH) {
+      return res.status(400).json({
+        success: false,
+        error: `Validation failed: speech transcript exceeds maximum allowed length of ${MAX_CITIZEN_TEXT_LENGTH} characters.`,
+      });
+    }
+
     // 1. Ingest audio from multipart file, buffer, or sample text
-    let audioBuffer = req.file?.buffer;
+    const audioBuffer = req.file?.buffer;
     const originalname = req.file?.originalname || 'recording.webm';
     const mimetype = req.file?.mimetype || 'audio/webm';
 
-    // 2. Whisper Speech-to-Text Transcription
+    // Reject an empty multipart body. Without this, transcribeAudio's fallback
+    // fabricated a placeholder grievance and stored a submission that no citizen
+    // ever made.
+    if (!recognizedSpeech && !(audioBuffer && audioBuffer.length > 0)) {
+      return res.status(400).json({
+        success: false,
+        error: 'No audio file or speech transcript was provided.',
+      });
+    }
+
+    // 2. Whisper Speech-to-Text transcription
     const sttResult = await transcribeAudio({
       buffer: audioBuffer,
       originalname,
@@ -192,53 +247,13 @@ router.post('/voice', submissionRateLimiter, upload.single('audio'), async (req,
       });
     }
 
-    // 3. LLM Reasoning & Classification Call
-    const aiResult = await classifyComplaint(transcribedText);
-
-    // 4. Resolve target ward (device GPS -> region name -> LLM guess)
-    const regions = await getRegions();
-    const targetWard = resolveWard(region_name || aiResult.region_guess, regions, latitude, longitude);
-
-    const hasGpsCoords = latitude !== undefined && latitude !== null && !isNaN(Number(latitude)) && Number(latitude) !== 0;
-    const finalLat = hasGpsCoords ? Number(latitude) : targetWard.latitude;
-    const finalLng = hasGpsCoords ? Number(longitude) : targetWard.longitude;
-    const finalRegionName = (region_name && region_name.trim().length > 0)
-      ? region_name.trim()
-      : (hasGpsCoords ? `Nagpur (${finalLat.toFixed(4)}, ${finalLng.toFixed(4)})` : targetWard.region_name);
-
-    // 5. Compute Multi-Factor Urgency Score
-    const severityWeight = Math.round(aiResult.severity * 10);
-    const urgency = computeUrgencyScore({
-      complaintSeverityWeight: severityWeight,
-      category: aiResult.category,
-      infraGapScore: targetWard.infra_gap_score || 50,
-      createdAt: new Date(),
-    });
-
-    // 6. Save to Database
-    const newSubmission = await createSubmission({
-      raw_input_type: 'voice',
-      raw_text: transcribedText,
-      language_detected: sttResult.language_detected || aiResult.language_detected || 'en',
-      translated_text: aiResult.translated_text || transcribedText,
-      category: aiResult.category || 'other',
-      latitude: finalLat,
-      longitude: finalLng,
-      region_name: finalRegionName,
-      urgency_score: urgency,
-      status: aiResult.status || 'new',
-    });
-
-    // 7. Dynamic Priority Project Recomputation & Tailored Grievance Intervention
-    const recomputeSummary = await recomputeAll();
-    const submissionIntervention = await generatePolicyRecommendation({
-      region_name: finalRegionName,
-      category: aiResult.category,
-      submission_count: 1,
-      avg_urgency: urgency,
-    });
-
-    const processingMs = Date.now() - startTime;
+    const { newSubmission, aiResult, recomputeSummary, intervention, processingMs } =
+      await ingestComplaint({
+        rawText: transcribedText.trim(),
+        inputType: 'voice',
+        body: req.body,
+        sttResult,
+      });
 
     res.status(201).json({
       success: true,
@@ -252,6 +267,7 @@ router.post('/voice', submissionRateLimiter, upload.single('audio'), async (req,
       },
       classification: {
         category: aiResult.category,
+        language_detected: sttResult.language_detected || aiResult.language_detected,
         translated_text: aiResult.translated_text,
         region_guess: aiResult.region_guess,
         severity_score_10: aiResult.severity,
@@ -262,7 +278,7 @@ router.post('/voice', submissionRateLimiter, upload.single('audio'), async (req,
       priority_impact: {
         total_projects: recomputeSummary?.projectsCount || 0,
         top_project: recomputeSummary?.topProject || null,
-        top_policy_action: submissionIntervention,
+        top_policy_action: intervention,
       },
     });
   } catch (err) {

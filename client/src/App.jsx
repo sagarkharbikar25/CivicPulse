@@ -12,6 +12,31 @@ import {
   recomputePriorities,
 } from './lib/api';
 
+/**
+ * True when two ward labels refer to the same ward.
+ * GPS-pinned submissions carry labels like "Nagpur (21.1458, 79.0640)" that
+ * never string-equals a registered ward name, so an exact comparison silently
+ * dropped every real-GPS complaint from the live heatmap update.
+ */
+function wardNameMatches(a, b) {
+  const norm = (v) =>
+    String(v || '')
+      .toLowerCase()
+      .replace(/[()/,]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  const left = norm(a);
+  const right = norm(b);
+  if (!left || !right) return false;
+  if (left.includes(right) || right.includes(left)) return true;
+  // Strip any trailing "(lat, lng)" geotag before comparing the bare ward name.
+  const stripCoords = (v) => norm(v).replace(/\s*\d+\s+[\d.]*\s*$/, '').trim();
+  const leftBare = stripCoords(a);
+  const rightBare = stripCoords(b);
+  if (!leftBare || !rightBare) return false;
+  return leftBare.includes(rightBare) || rightBare.includes(leftBare);
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [heatmapData, setHeatmapData] = useState([]);
@@ -59,7 +84,7 @@ export default function App() {
 
     setHeatmapData((prev) =>
       prev.map((p) => {
-        if (p.name === newSub.region_name || p.id === newSub.region_id) {
+        if (wardNameMatches(p.name, newSub.region_name) || p.id === newSub.region_id) {
           const newIntensity = Math.min(
             100,
             Math.round(((p.intensity || 70) + (newSub.urgency_score || 80)) / 2)
@@ -87,13 +112,22 @@ export default function App() {
     if (options.showToast !== false) {
       showToast(`⚡ Realtime: ${newSub.category || 'Grievance'} logged for ${newSub.region_name || 'Ward'} (Urgency: ${newSub.urgency_score || 80}/100)`);
     }
+
+    // Refresh dynamic priorities whenever a new submission is logged
+    fetchPriorities().then((freshPrios) => {
+      if (Array.isArray(freshPrios) && freshPrios.length > 0) {
+        setPriorities(freshPrios);
+      }
+    }).catch(() => {});
   }, [showToast]);
+
+  const handleRealtimeInsert = useCallback((newSub) => {
+    handleIncomingRecord(newSub, { showToast: true });
+  }, [handleIncomingRecord]);
 
   // Supabase Realtime WebSocket hook + sync
   useRealtimeSubmissions({
-    onInsert: (newSub) => {
-      handleIncomingRecord(newSub, { showToast: true });
-    },
+    onInsert: handleRealtimeInsert,
   });
 
   const handleRecompute = async () => {

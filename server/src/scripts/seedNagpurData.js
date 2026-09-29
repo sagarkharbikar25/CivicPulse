@@ -1,97 +1,86 @@
-/**
- * CivicPulse In-Memory Store & Fallback Layer
- * Pre-seeded with 12 authentic city wards and initial submissions.
- * Guarantees zero downtime and instant local development out-of-the-box.
- */
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+dotenv.config();
 
-import { computeUrgencyScore, recomputePriorityProjects } from '../services/scoringEngine.js';
+const supabaseUrl = process.env.SUPABASE_URL?.trim();
+const supabaseServiceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY)?.trim();
 
-export const INITIAL_REGIONS = [
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('Supabase credentials missing in .env');
+  process.exit(1);
+}
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+const NAGPUR_REGIONS = [
   {
-    id: 'reg-01',
     region_name: 'Zone 2 - Dharampeth / Civil Lines (Nagpur)',
     latitude: 21.1458,
     longitude: 79.0720,
     population: 220000,
     infra_gap_score: 94.0,
     past_investment_amount: 1400000,
-    last_updated: new Date().toISOString(),
   },
   {
-    id: 'reg-02',
     region_name: 'Zone 4 - Dhantoli / Sitabuldi (Nagpur)',
     latitude: 21.1420,
     longitude: 79.0850,
     population: 210000,
     infra_gap_score: 91.5,
     past_investment_amount: 1100000,
-    last_updated: new Date().toISOString(),
   },
   {
-    id: 'reg-03',
     region_name: 'Zone 3 - Hanuman Nagar / Medical Square (Nagpur)',
     latitude: 21.1180,
     longitude: 79.0950,
     population: 260000,
     infra_gap_score: 88.0,
     past_investment_amount: 950000,
-    last_updated: new Date().toISOString(),
   },
   {
-    id: 'reg-04',
     region_name: 'MIHAN / Butibori Industrial Zone (Nagpur)',
     latitude: 21.0350,
     longitude: 79.0250,
     population: 180000,
     infra_gap_score: 85.0,
     past_investment_amount: 2100000,
-    last_updated: new Date().toISOString(),
   },
   {
-    id: 'reg-05',
     region_name: 'Zone 1 - Laxmi Nagar / Bajaj Nagar (Nagpur)',
     latitude: 21.1250,
     longitude: 79.0650,
     population: 245000,
     infra_gap_score: 78.5,
     past_investment_amount: 1650000,
-    last_updated: new Date().toISOString(),
   },
   {
-    id: 'reg-06',
     region_name: 'Zone 10 - Mangalwari / Sadar (Nagpur)',
     latitude: 21.1650,
     longitude: 79.0780,
     population: 250000,
     infra_gap_score: 72.0,
     past_investment_amount: 1800000,
-    last_updated: new Date().toISOString(),
   },
   {
-    id: 'reg-07',
     region_name: 'Zone 9 - Ashi Nagar / Jaripatka (Nagpur)',
     latitude: 21.1850,
     longitude: 79.0980,
     population: 290000,
     infra_gap_score: 86.0,
     past_investment_amount: 850000,
-    last_updated: new Date().toISOString(),
   },
   {
-    id: 'reg-08',
     region_name: 'Zone 6 - Gandhibagh / Itwari / Old City (Nagpur)',
     latitude: 21.1550,
     longitude: 79.1100,
     population: 310000,
     infra_gap_score: 82.5,
     past_investment_amount: 720000,
-    last_updated: new Date().toISOString(),
   },
 ];
 
-export const INITIAL_SUBMISSIONS = [
+const NAGPUR_SUBMISSIONS = [
   {
-    id: 'sub-ngp-001',
     raw_input_type: 'voice',
     raw_text: 'Dharampeth main road par 100mm drinking water feeder line burst ho gayi hai, do din se pure area me paani nahi aa raha.',
     language_detected: 'hi',
@@ -105,7 +94,6 @@ export const INITIAL_SUBMISSIONS = [
     created_at: new Date(Date.now() - 1 * 3600000).toISOString(),
   },
   {
-    id: 'sub-ngp-002',
     raw_input_type: 'voice',
     raw_text: 'Civil Lines court road jawal drinking water pipeline leak ahe, rastyavar paani saachlay.',
     language_detected: 'mr',
@@ -119,7 +107,6 @@ export const INITIAL_SUBMISSIONS = [
     created_at: new Date(Date.now() - 3 * 3600000).toISOString(),
   },
   {
-    id: 'sub-ngp-003',
     raw_input_type: 'text',
     raw_text: 'Shankar Nagar square feeder valve damaged, contaminated water backflowing into residential taps.',
     language_detected: 'en',
@@ -133,7 +120,6 @@ export const INITIAL_SUBMISSIONS = [
     created_at: new Date(Date.now() - 5 * 3600000).toISOString(),
   },
   {
-    id: 'sub-ngp-004',
     raw_input_type: 'text',
     raw_text: 'Sitabuldi main market entrance road crater and exposed high-voltage cables causing severe road block and electrocution hazard.',
     language_detected: 'en',
@@ -147,7 +133,6 @@ export const INITIAL_SUBMISSIONS = [
     created_at: new Date(Date.now() - 2 * 3600000).toISOString(),
   },
   {
-    id: 'sub-ngp-005',
     raw_input_type: 'voice',
     raw_text: 'Sitabuldi metro station jawal motha khadda padla ahe, ambulance adakli hoti kal ratri.',
     language_detected: 'mr',
@@ -161,7 +146,6 @@ export const INITIAL_SUBMISSIONS = [
     created_at: new Date(Date.now() - 4 * 3600000).toISOString(),
   },
   {
-    id: 'sub-ngp-006',
     raw_input_type: 'voice',
     raw_text: 'Medical Square jawal high-voltage transformer spark hot ahe ani oil leak hot ahe, hospital ICU patient sathi khup dhoka ahe.',
     language_detected: 'mr',
@@ -175,7 +159,6 @@ export const INITIAL_SUBMISSIONS = [
     created_at: new Date(Date.now() - 2 * 3600000).toISOString(),
   },
   {
-    id: 'sub-ngp-007',
     raw_input_type: 'text',
     raw_text: 'Hanuman Nagar main transmission line short circuit repeatedly tripping government medical college trauma center grid.',
     language_detected: 'en',
@@ -189,7 +172,6 @@ export const INITIAL_SUBMISSIONS = [
     created_at: new Date(Date.now() - 6 * 3600000).toISOString(),
   },
   {
-    id: 'sub-ngp-008',
     raw_input_type: 'text',
     raw_text: 'MIHAN flyover approach road underground drainage overflow causing heavy vehicle skidding and severe sanitation issues.',
     language_detected: 'en',
@@ -203,7 +185,6 @@ export const INITIAL_SUBMISSIONS = [
     created_at: new Date(Date.now() - 8 * 3600000).toISOString(),
   },
   {
-    id: 'sub-ngp-009',
     raw_input_type: 'text',
     raw_text: 'Laxmi Nagar 8-inch water pipe rupture flooding residential basements near water tank.',
     language_detected: 'en',
@@ -217,7 +198,6 @@ export const INITIAL_SUBMISSIONS = [
     created_at: new Date(Date.now() - 10 * 3600000).toISOString(),
   },
   {
-    id: 'sub-ngp-010',
     raw_input_type: 'text',
     raw_text: 'Sadar residency road main junction streetlights completely blackout for 48 hours, high accident rate at night.',
     language_detected: 'en',
@@ -232,132 +212,51 @@ export const INITIAL_SUBMISSIONS = [
   },
 ];
 
-class LocalDataStore {
-  constructor() {
-    this.regions = [...INITIAL_REGIONS];
-    this.submissions = [...INITIAL_SUBMISSIONS];
-    this.priorityProjects = recomputePriorityProjects(this.submissions, this.regions);
+async function migrate() {
+  console.log('🔄 Cleaning up dummy test data from Supabase...');
+
+  // 1. Delete all non-Nagpur dummy submissions
+  const dummyKeywords = ['Dharavi', 'Kurla', 'Mankhurd', 'Charminar', 'Bandra', 'Govandi', 'Andheri', 'Hinjewadi', 'Whitefield', 'Kothrud', 'Indiranagar', 'Colaba'];
+  
+  for (const kw of dummyKeywords) {
+    const { error } = await supabase
+      .from('submissions')
+      .delete()
+      .ilike('region_name', `%${kw}%`);
+    if (error) console.warn(`Error deleting ${kw}:`, error.message);
   }
 
-  getRegions() {
-    return [...this.regions];
+  // 2. Also delete old priority_projects rows
+  const { error: pError } = await supabase
+    .from('priority_projects')
+    .delete()
+    .neq('id', '00000000-0000-0000-0000-000000000000'); // delete all
+  if (pError) console.warn('Error clearing priority_projects:', pError.message);
+
+  // 3. Upsert authentic Nagpur regions into region_index
+  for (const reg of NAGPUR_REGIONS) {
+    const { error: regErr } = await supabase
+      .from('region_index')
+      .upsert(reg, { onConflict: 'region_name' });
+    if (regErr) console.warn(`Error upserting ${reg.region_name}:`, regErr.message);
   }
 
-  getRegionByName(name) {
-    if (!name) return null;
-    return this.regions.find(r => r.region_name.toLowerCase().includes(name.toLowerCase())) || null;
+  // 4. Insert authentic Nagpur submissions
+  const { data: insertedSubs, error: insErr } = await supabase
+    .from('submissions')
+    .insert(NAGPUR_SUBMISSIONS)
+    .select();
+  if (insErr) {
+    console.error('Error inserting Nagpur submissions:', insErr.message);
+  } else {
+    console.log(`✅ Seeded ${insertedSubs?.length || 0} authentic Nagpur submissions.`);
   }
 
-  getSubmissions({ region, category, status, limit = 50, sort = 'newest' } = {}) {
-    let result = [...this.submissions];
-
-    if (region && region !== 'all') {
-      result = result.filter(s => s.region_name && s.region_name.toLowerCase().includes(region.toLowerCase()));
-    }
-    if (category && category !== 'all') {
-      result = result.filter(s => s.category && s.category.toLowerCase() === category.toLowerCase());
-    }
-    if (status && status !== 'all') {
-      result = result.filter(s => s.status && s.status.toLowerCase() === status.toLowerCase());
-    }
-
-    if (sort === 'urgency') {
-      result.sort((a, b) => (b.urgency_score || 0) - (a.urgency_score || 0));
-    } else {
-      result.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    }
-
-    return result.slice(0, Number(limit));
-  }
-
-  /**
-   * Mirrors an already-persisted row into the in-memory cache without
-   * re-inserting it. Used when the authoritative copy lives in Supabase.
-   */
-  trackSubmission(row) {
-    if (!row || !row.id) return null;
-    const existingIndex = this.submissions.findIndex(s => s.id === row.id);
-    if (existingIndex !== -1) {
-      this.submissions[existingIndex] = { ...this.submissions[existingIndex], ...row };
-      return this.submissions[existingIndex];
-    }
-    this.submissions.unshift(row);
-    this.priorityProjects = recomputePriorityProjects(this.submissions, this.regions);
-    return row;
-  }
-
-  addSubmission(submissionData) {
-    const matchingRegion = this.getRegionByName(submissionData.region_name) || this.regions[0];
-
-    // The route already computed an urgency score from the LLM severity rating.
-    // Recomputing it here from the category baseline silently discarded that
-    // signal (a severity-9 hazard scored the same as routine maintenance), so
-    // an explicit score is now always preserved.
-    const providedScore = Number(submissionData.urgency_score);
-    const urgency = Number.isFinite(providedScore)
-      ? Math.max(0, Math.min(100, providedScore))
-      : computeUrgencyScore({
-          category: submissionData.category || 'other',
-          infraGapScore: matchingRegion?.infra_gap_score || 50,
-          createdAt: new Date(),
-        });
-
-    const newSubmission = {
-      id: `sub-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`,
-      raw_input_type: submissionData.raw_input_type || 'text',
-      raw_text: submissionData.raw_text || '',
-      language_detected: submissionData.language_detected || 'en',
-      translated_text: submissionData.translated_text || submissionData.raw_text || '',
-      category: submissionData.category || 'other',
-      latitude: Number(submissionData.latitude) || matchingRegion?.latitude || 0,
-      longitude: Number(submissionData.longitude) || matchingRegion?.longitude || 0,
-      region_name: submissionData.region_name || matchingRegion?.region_name || 'Unassigned Ward',
-      urgency_score: urgency,
-      status: submissionData.status || 'new',
-      created_at: new Date().toISOString(),
-    };
-
-    this.submissions.unshift(newSubmission);
-    // Refresh priority projects
-    this.priorityProjects = recomputePriorityProjects(this.submissions, this.regions);
-    return newSubmission;
-  }
-
-  getPriorityProjects() {
-    return [...this.priorityProjects];
-  }
-
-  /**
-   * Rebuilds the priority ranking.
-   *
-   * Existing urgency scores are preserved because they encode LLM-assessed
-   * severity that cannot be recovered from the stored row alone. Only rows
-   * missing a usable score are derived from their category baseline.
-   */
-  recomputeScores() {
-    this.submissions = this.submissions.map(sub => {
-      const existing = Number(sub.urgency_score);
-      if (Number.isFinite(existing) && existing >= 0 && existing <= 100) {
-        return sub;
-      }
-      const reg = this.getRegionByName(sub.region_name);
-      const updatedUrgency = computeUrgencyScore({
-        category: sub.category,
-        infraGapScore: reg?.infra_gap_score || 50,
-        createdAt: sub.created_at,
-      });
-      return { ...sub, urgency_score: updatedUrgency };
-    });
-
-    this.priorityProjects = recomputePriorityProjects(this.submissions, this.regions);
-    return {
-      success: true,
-      submissionsCount: this.submissions.length,
-      projectsCount: this.priorityProjects.length,
-      topProject: this.priorityProjects[0] || null,
-      recomputed_at: new Date().toISOString(),
-    };
-  }
+  console.log('🎉 Cleanup and migration complete!');
+  process.exit(0);
 }
 
-export const localStore = new LocalDataStore();
+migrate().catch(e => {
+  console.error(e);
+  process.exit(1);
+});

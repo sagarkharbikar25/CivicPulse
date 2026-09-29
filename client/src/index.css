@@ -15,12 +15,11 @@
   }
 }
 
-/* Static glowing horizontal light slits from reference image */
+/* Subtle horizontal hairline */
 .light-slit {
   position: relative;
   height: 1px;
-  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 30%, #ffffff 50%, rgba(255,255,255,0.4) 70%, transparent 100%);
-  box-shadow: 0 0 12px 2px rgba(255, 255, 255, 0.7), 0 0 24px 4px rgba(255, 255, 255, 0.25);
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.15) 30%, rgba(255,255,255,0.25) 50%, rgba(255,255,255,0.15) 70%, transparent 100%);
 }
 
 /* Animated Smooth Moving Light Beam on Frames (Fixes blue line, adds pure white moving animation) */

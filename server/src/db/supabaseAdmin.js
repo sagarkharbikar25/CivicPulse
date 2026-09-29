@@ -5,10 +5,28 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { createHash } from 'node:crypto';
 import dotenv from 'dotenv';
 import { localStore } from './localStore.js';
+import { coerceNumber } from '../services/scoringEngine.js';
 
 dotenv.config();
+
+/**
+ * Derives a stable UUIDv5 from a natural key so that repeated recomputes
+ * upsert the same row instead of churning ids.
+ */
+function deterministicUuid(key) {
+  const NAMESPACE = '6f1a7c58-1f3a-5b2e-9d44-8c0a1e2b3c4d';
+  const hex = createHash('sha1').update(`${NAMESPACE}:${key}`).digest('hex');
+  return [
+    hex.slice(0, 8),
+    hex.slice(8, 12),
+    `5${hex.slice(13, 16)}`,
+    ((parseInt(hex.slice(16, 17), 16) & 0x3) | 0x8).toString(16) + hex.slice(17, 20),
+    hex.slice(20, 32),
+  ].join('-');
+}
 
 const supabaseUrl = process.env.SUPABASE_URL?.trim();
 const supabaseServiceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY)?.trim();
@@ -20,7 +38,56 @@ export const isSupabaseConfigured = Boolean(
   supabaseServiceKey.length > 10
 );
 
+/**
+ * Test isolation gate.
+ *
+ * Automated tests must never mutate the live Supabase project that backs the
+ * demo, otherwise every run permanently pollutes the production dataset and
+ * makes results non-deterministic. Set CIVICPULSE_TEST_USE_LIVE_DB=true to
+ * opt back into live-database integration runs.
+ */
+export function shouldUseSupabase() {
+  if (!supabaseClient) return false;
+  if (process.env.NODE_ENV === 'test' && process.env.CIVICPULSE_TEST_USE_LIVE_DB !== 'true') {
+    return false;
+  }
+  return true;
+}
+
 let supabaseClient = null;
+
+export function isLegacyDummy(name) {
+  if (!name) return false;
+  const s = String(name).toLowerCase();
+  return (
+    s.includes('dharavi') ||
+    s.includes('kurla') ||
+    s.includes('shahu nagar') ||
+    s.includes('mankhurd') ||
+    s.includes('bandra') ||
+    s.includes('chembur') ||
+    s.includes('andheri') ||
+    s.includes('colaba') ||
+    s.includes('hinjewadi') ||
+    s.includes('kothrud') ||
+    s.includes('whitefield') ||
+    s.includes('charminar')
+  );
+}
+
+const DEFAULT_SUBMISSION_LIMIT = 50;
+const MAX_SUBMISSION_LIMIT = 1000;
+
+/**
+ * Coerces a user-supplied `limit` into a safe positive integer.
+ * Without this, `?limit=abc` produces NaN, which silently yields an empty
+ * result set in the in-memory store and an error in PostgREST.
+ */
+export function normalizeLimit(limit, fallback = DEFAULT_SUBMISSION_LIMIT) {
+  const parsed = Number.parseInt(limit, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.min(parsed, MAX_SUBMISSION_LIMIT);
+}
 
 if (isSupabaseConfigured) {
   try {
@@ -46,7 +113,7 @@ export function getSupabase() {
  * Fetch all regions from region_index
  */
 export async function getRegions() {
-  if (supabaseClient) {
+  if (shouldUseSupabase()) {
     try {
       const { data, error } = await supabaseClient
         .from('region_index')
@@ -54,19 +121,23 @@ export async function getRegions() {
         .order('infra_gap_score', { ascending: false });
 
       if (error) throw error;
-      if (data && data.length > 0) return data;
+      if (data && data.length > 0) {
+        const clean = data.filter(r => !isLegacyDummy(r.region_name));
+        if (clean.length > 0) return clean;
+      }
     } catch (err) {
       console.warn('[DB] Supabase getRegions failed, falling back:', err.message);
     }
   }
-  return localStore.getRegions();
+  return localStore.getRegions().filter(r => !isLegacyDummy(r.region_name));
 }
 
 /**
  * Fetch submissions with filtering
  */
 export async function getSubmissions({ region, category, status, limit = 50, sort = 'newest' } = {}) {
-  if (supabaseClient) {
+  const safeLimit = normalizeLimit(limit);
+  if (shouldUseSupabase()) {
     try {
       let query = supabaseClient.from('submissions').select('*');
 
@@ -86,24 +157,26 @@ export async function getSubmissions({ region, category, status, limit = 50, sor
         query = query.order('created_at', { ascending: false });
       }
 
-      query = query.limit(Number(limit));
+      query = query.limit(safeLimit);
 
       const { data, error } = await query;
       if (error) throw error;
-      if (data) return data;
+      if (data) {
+        return data.filter(s => !isLegacyDummy(s.region_name));
+      }
     } catch (err) {
       console.warn('[DB] Supabase getSubmissions failed, falling back:', err.message);
     }
   }
 
-  return localStore.getSubmissions({ region, category, status, limit, sort });
+  return localStore.getSubmissions({ region, category, status, limit: safeLimit, sort }).filter(s => !isLegacyDummy(s.region_name));
 }
 
 /**
  * Create a new submission
  */
 export async function createSubmission(submissionData) {
-  if (supabaseClient) {
+  if (shouldUseSupabase()) {
     try {
       const row = {
         raw_input_type: submissionData.raw_input_type || 'text',
@@ -111,11 +184,11 @@ export async function createSubmission(submissionData) {
         language_detected: submissionData.language_detected || 'en',
         translated_text: submissionData.translated_text || submissionData.raw_text,
         category: submissionData.category || 'other',
-        latitude: Number(submissionData.latitude) || 19.0402,
-        longitude: Number(submissionData.longitude) || 72.8508,
-        region_name: submissionData.region_name || 'Ward 12 - Dharavi / Shahu Nagar',
-        urgency_score: Number(submissionData.urgency_score) || 75,
-        status: submissionData.status || 'classified',
+        latitude: coerceNumber(submissionData.latitude, 21.1458),
+        longitude: coerceNumber(submissionData.longitude, 79.0720),
+        region_name: submissionData.region_name || 'Zone 2 - Dharampeth / Civil Lines (Nagpur)',
+        urgency_score: coerceNumber(submissionData.urgency_score, 75),
+        status: submissionData.status || 'new',
       };
 
       const { data, error } = await supabaseClient
@@ -126,7 +199,7 @@ export async function createSubmission(submissionData) {
 
       if (error) throw error;
       if (data) {
-        localStore.addSubmission(data);
+        localStore.trackSubmission(data);
         return data;
       }
     } catch (err) {
@@ -141,7 +214,7 @@ export async function createSubmission(submissionData) {
  * Fetch priority projects
  */
 export async function getPriorityProjects() {
-  if (supabaseClient) {
+  if (shouldUseSupabase()) {
     try {
       const { data, error } = await supabaseClient
         .from('priority_projects')
@@ -149,47 +222,56 @@ export async function getPriorityProjects() {
         .order('final_priority_rank', { ascending: true });
 
       if (error) throw error;
-      if (data && data.length > 0) return data;
+      if (data && data.length > 0) {
+        const clean = data.filter(p => !isLegacyDummy(p.region_name));
+        if (clean.length > 0) return clean;
+      }
     } catch (err) {
       console.warn('[DB] Supabase getPriorityProjects failed, falling back:', err.message);
     }
   }
 
-  return localStore.getPriorityProjects();
+  return localStore.getPriorityProjects().filter(p => !isLegacyDummy(p.region_name));
 }
 
 /**
- * Persist or recompute priority projects
+ * Persist or recompute priority projects.
  */
 export async function syncPriorityProjects(projects) {
-  if (supabaseClient && projects.length > 0) {
+  if (shouldUseSupabase() && projects.length > 0) {
     try {
-      const sanitized = projects.map(p => {
-        const row = {
+      // Purge any legacy dummy records from priority_projects
+      await supabaseClient
+        .from('priority_projects')
+        .delete()
+        .or('region_name.ilike.%dharavi%,region_name.ilike.%kurla%,region_name.ilike.%shahu nagar%,region_name.ilike.%mankhurd%,region_name.ilike.%bandra%,region_name.ilike.%chembur%,region_name.ilike.%andheri%,region_name.ilike.%colaba%');
+
+      const sanitized = projects
+        .filter(p => !isLegacyDummy(p.region_name))
+        .map((p) => ({
+          id: deterministicUuid(`${p.region_name}::${p.category}`),
           region_name: p.region_name,
           category: p.category,
-          submission_count: Number(p.submission_count) || 1,
-          avg_urgency: Number(p.avg_urgency) || 75,
-          final_priority_rank: Number(p.final_priority_rank) || 1,
+          submission_count: coerceNumber(p.submission_count, 1),
+          avg_urgency: coerceNumber(p.avg_urgency, 75),
+          final_priority_rank: coerceNumber(p.final_priority_rank, 1),
           recommended_action: p.recommended_action || 'Public works intervention required.',
-        };
-        if (p.id && typeof p.id === 'string' && p.id.length === 36 && p.id.includes('-')) {
-          row.id = p.id;
-        }
-        return row;
-      });
+        }));
 
-      // Clear and re-insert priority projects
-      await supabaseClient.from('priority_projects').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      const { data, error } = await supabaseClient.from('priority_projects').insert(sanitized).select();
-      if (error) throw error;
-      return data;
+      if (sanitized.length > 0) {
+        const { data, error } = await supabaseClient
+          .from('priority_projects')
+          .upsert(sanitized, { onConflict: 'id' })
+          .select();
+        if (error) throw error;
+        return data;
+      }
     } catch (err) {
       console.warn('[DB] Supabase syncPriorityProjects failed, falling back:', err.message);
     }
   }
 
-  return localStore.priorityProjects;
+  return localStore.priorityProjects.filter(p => !isLegacyDummy(p.region_name));
 }
 
 /**
@@ -197,8 +279,8 @@ export async function syncPriorityProjects(projects) {
  */
 export async function recomputeAll() {
   const regions = await getRegions();
-  const submissions = await getSubmissions({ limit: 1000 });
-  
+  const submissions = await getSubmissions({ limit: MAX_SUBMISSION_LIMIT });
+
   if (Array.isArray(regions) && regions.length > 0) {
     localStore.regions = regions;
   }
@@ -208,8 +290,12 @@ export async function recomputeAll() {
 
   const result = localStore.recomputeScores();
 
-  if (supabaseClient) {
+  if (shouldUseSupabase()) {
     try {
+      await supabaseClient
+        .from('submissions')
+        .delete()
+        .or('region_name.ilike.%dharavi%,region_name.ilike.%kurla%,region_name.ilike.%shahu nagar%,region_name.ilike.%mankhurd%,region_name.ilike.%bandra%,region_name.ilike.%chembur%,region_name.ilike.%andheri%,region_name.ilike.%colaba%');
       await syncPriorityProjects(result.topProject ? localStore.priorityProjects : []);
     } catch (e) {
       console.warn('[DB] Recompute sync error:', e.message);

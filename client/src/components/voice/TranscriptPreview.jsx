@@ -36,9 +36,6 @@ export default function TranscriptPreview({ result, onViewOnMap, onReset }) {
 
   return (
     <Card className="p-6 border border-white/15 bg-[#0a0a0c]/90 backdrop-blur-xl animate-fade-in relative overflow-hidden">
-      {/* Top beam glow */}
-      <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-white/50 to-transparent" />
-
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
